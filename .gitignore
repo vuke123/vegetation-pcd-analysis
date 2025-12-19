@@ -96,7 +96,6 @@ scripts/out/
 *.tiff
 *.geotiff
 *.jp2
-*.png
 *.jpg
 *.jpeg
 *.bmp
