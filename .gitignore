@@ -1,0 +1,131 @@
+################################################################################
+# OS / Editor junk
+################################################################################
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
+
+################################################################################
+# Python
+################################################################################
+__pycache__/
+*.py[cod]
+*.pyd
+.venv/
+venv/
+env/
+ENV/
+pip-wheel-metadata/
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+
+################################################################################
+# Jupyter (keep notebooks, ignore heavy outputs if exported)
+################################################################################
+# (Notebooks themselves are tracked; checkpoints are ignored above)
+*.nbconvert.ipynb
+
+################################################################################
+# C/C++ build artifacts (CMake / Make)
+################################################################################
+# Your scripts/build folder
+scripts/build/
+# Generic CMake build folders
+build*/
+cmake-build*/
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
+compile_commands.json
+*.ninja
+*.ninja_deps
+*.ninja_log
+*.o
+*.obj
+*.a
+*.lib
+*.so
+*.dylib
+*.dll
+*.exe
+*.out
+*.app
+
+################################################################################
+# Project outputs / logs / temporary results
+################################################################################
+out/
+scripts/out/
+*.log
+*.tmp
+*.bak
+*.cache
+
+################################################################################
+# Point cloud / geospatial data (large)
+################################################################################
+# LAS/LAZ/LAZ
+*.las
+*.laz
+*.copc.laz
+
+# PCL/Open3D point clouds
+*.pcd
+*.ply
+*.xyz
+*.pts
+
+# Meshes / 3D
+*.obj
+*.stl
+*.glb
+*.gltf
+
+# Raster / imagery / GIS
+*.tif
+*.tiff
+*.geotiff
+*.jp2
+*.png
+*.jpg
+*.jpeg
+*.bmp
+*.gif
+*.asc
+*.dem
+
+# PDAL / LiDAR sidecars
+*.lax
+*.lasx
+
+################################################################################
+# Large derived artifacts / exports
+################################################################################
+*.zip
+*.tar
+*.tar.gz
+*.7z
+*.pdf
+*.mp4
+
+################################################################################
+# Datasource folder: ignore everything except a README placeholder
+################################################################################
+datasource/**
+!datasource/
+!datasource/README.md
+
+################################################################################
+# Research papers: usually don't version PDFs unless you really want to
+################################################################################
+research_papers/**/*.pdf
