@@ -192,7 +192,7 @@ int main()
 
     // Load input cloud.
     pcl::PointCloud<pcl::PointXYZ>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZ>);
-    const std::string input_file = "../LOCAL_VINEYARD_MS.las";
+    const std::string input_file = "../datasource/LOCAL_VINEYARD_MS.las";
 
     if (!loadPointCloud(input_file, cloud))
     {

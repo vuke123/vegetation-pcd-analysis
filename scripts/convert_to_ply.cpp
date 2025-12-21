@@ -3,6 +3,10 @@
 #include <pcl/io/ply_io.h>
 #include <pcl/point_types.h>
 
+
+
+//ply is good for other tools like MeshLab/Blender/CloudCompare
+
 int main(int argc, char** argv) {
     if (argc < 3) {
         std::cout << "Usage: " << argv[0] << " <input.pcd> <output.ply>" << std::endl;
