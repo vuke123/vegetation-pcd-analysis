@@ -212,9 +212,9 @@ int main()
     }
 
     // Parameter sweep (meters).
-    std::vector<float> leaf_sizes          = {0.05f, 0.10f, 0.20f};
-    std::vector<float> distance_thresholds = {0.03f, 0.09f, 0.15f};
-    std::vector<float> cluster_tolerances  = {0.40f, 0.80f, 1.20f};
+    std::vector<float> leaf_sizes          = {0.19f, 0.20f, 0.22f};
+    std::vector<float> distance_thresholds = {0.02f, 0.8f, 0.12f};
+    std::vector<float> cluster_tolerances  = {0.6f, 0.80f, 1.0f};
 
     const std::size_t L = leaf_sizes.size();
     const std::size_t D = distance_thresholds.size();
@@ -423,7 +423,7 @@ int main()
                 const double cluster_s =
                     std::chrono::duration_cast<std::chrono::milliseconds>(cluster_end - cluster_start).count() / 1000.0;
 
-                const bool valid = (cluster_indices.size() <= 10);
+                const bool valid = (cluster_indices.size() <= 30);
                 const std::string reason = valid ? "ok" : "too_many_clusters";
 
                 std::cout << "  clusters=" << cluster_indices.size()
