@@ -29,5 +29,18 @@ target_link_libraries(convert_to_ply
     ${PCL_LIBRARIES}
 )
 
-add_executable(pcl_tutorial_clustering pcl_tutorial_clustering.cpp)
-target_link_libraries(pcl_tutorial_clustering ${PCL_LIBRARIES} ${PDAL_LIBRARIES})
+add_executable(ground_removal_only ground_removal_only.cpp)
+
+target_link_libraries(ground_removal_only
+  ${PCL_LIBRARIES}
+  ${PDAL_LIBRARIES}
+)
+
+add_executable(pcl_clustering pcl_clustering.cpp)
+target_link_libraries(pcl_clustering ${PCL_LIBRARIES} ${PDAL_LIBRARIES})
+
+add_executable(clustering_only clustering_only.cpp)
+
+target_include_directories(clustering_only PRIVATE ${PCL_INCLUDE_DIRS})
+target_link_libraries(clustering_only PRIVATE ${PCL_LIBRARIES})
+target_compile_definitions(clustering_only PRIVATE ${PCL_DEFINITIONS})
