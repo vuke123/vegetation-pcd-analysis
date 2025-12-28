@@ -22,21 +22,21 @@ link_directories(${PCL_LIBRARY_DIRS})
 add_definitions(${PCL_DEFINITIONS})
 
 # Create converter executable
-add_executable(convert_to_ply convert_to_ply.cpp)
+add_executable(convert_to_ply ./alternatives/convert_to_ply.cpp)
 
 # Link libraries for converter
 target_link_libraries(convert_to_ply 
     ${PCL_LIBRARIES}
 )
 
-add_executable(ground_removal_only ground_removal_only.cpp)
+add_executable(ground_removal_only ./alternatives/ground_removal_only.cpp)
 
 target_link_libraries(ground_removal_only
   ${PCL_LIBRARIES}
   ${PDAL_LIBRARIES}
 )
 
-add_executable(pcl_clustering pcl_clustering.cpp)
+add_executable(pcl_clustering ./alternatives/pcl_clustering.cpp)
 target_link_libraries(pcl_clustering ${PCL_LIBRARIES} ${PDAL_LIBRARIES})
 
 add_executable(clustering_only clustering_only.cpp)

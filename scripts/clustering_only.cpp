@@ -1,24 +1,28 @@
 #include <pcl/point_types.h>
 #include <pcl/io/pcd_io.h>
-#include <pcl/filters/voxel_grid.h>
 #include <pcl/search/kdtree.h>
 #include <pcl/segmentation/extract_clusters.h>
+#include <pcl/PCLPointCloud2.h>
+#include <pcl/conversions.h>
+#include <pcl/filters/extract_indices.h>
 
-#include <algorithm>
-#include <chrono>
+#include <sys/stat.h>
+#include <sys/types.h>
 #include <ctime>
+#include <chrono>
 #include <fstream>
 #include <iomanip>
 #include <iostream>
 #include <sstream>
 #include <string>
-#include <sys/stat.h>
-#include <sys/types.h>
 #include <vector>
+#include <algorithm>
+#include <cctype>
+#include <cstdlib>
 
 static void ensure_dir(const std::string& path)
 {
-    ::mkdir(path.c_str(), 0755); // ignores "already exists"
+    ::mkdir(path.c_str(), 0755); 
 }
 
 static std::string nowIso8601()
@@ -43,15 +47,126 @@ static std::string cmTag(float meters)
     return oss.str();
 }
 
-static bool loadPCD(const std::string& filename, pcl::PointCloud<pcl::PointXYZ>::Ptr cloud)
+static bool file_exists(const std::string& p)
 {
-    pcl::PCDReader reader;
-    if (reader.read(filename, *cloud) == -1)
+    struct stat st;
+    return (stat(p.c_str(), &st) == 0) && S_ISREG(st.st_mode);
+}
+
+static std::time_t file_mtime(const std::string& p)
+{
+    struct stat st;
+    if (stat(p.c_str(), &st) != 0) return 0;
+    return st.st_mtime;
+}
+
+static long long file_size(const std::string& p)
+{
+    struct stat st;
+    if (stat(p.c_str(), &st) != 0) return -1;
+    return static_cast<long long>(st.st_size);
+}
+
+static std::string to_lower(std::string s)
+{
+    std::transform(s.begin(), s.end(), s.begin(),
+                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    return s;
+}
+
+static std::string get_ext(const std::string& p)
+{
+    size_t dot = p.find_last_of('.');
+    if (dot == std::string::npos) return "";
+    return to_lower(p.substr(dot));
+}
+
+static std::string replace_ext(const std::string& p, const std::string& newExt)
+{
+    size_t dot = p.find_last_of('.');
+    if (dot == std::string::npos) return p + newExt;
+    return p.substr(0, dot) + newExt;
+}
+
+static bool ensure_pcd_from_las(const std::string& lasPath, const std::string& pcdPath)
+{
+    bool needConvert = true;
+
+    if (file_exists(pcdPath))
     {
-        std::cerr << "Error reading PCD: " << filename << "\n";
+        if (file_mtime(pcdPath) >= file_mtime(lasPath) && file_size(pcdPath) > 200)
+            needConvert = false;
+    }
+
+    if (!needConvert) return true;
+
+    std::ostringstream cmd;
+    cmd << "pdal translate "
+    << "\"" << lasPath << "\" "
+    << "\"" << pcdPath << "\" "
+    << "--writers.pcd.compression=binary "
+    << "--writers.pcd.order=\"X=Float,Y=Float,Z=Float,Red=Unsigned16,Infrared=Unsigned16\" "
+    << "--writers.pcd.keep_unspecified=true";
+
+
+    std::cout << "Converting LAS/LAZ -> PCD using PDAL:\n  " << cmd.str() << "\n";
+    int ret = std::system(cmd.str().c_str());
+    if (ret != 0 || !file_exists(pcdPath) || file_size(pcdPath) <= 200)
+    {
+        std::cerr << "PDAL conversion failed or produced empty PCD.\n";
         return false;
     }
-    std::cout << "Loaded PCD: " << filename << " (" << cloud->size() << " pts)\n";
+    return true;
+}
+
+static bool loadPCDWithAttrs(const std::string& filename,
+                            pcl::PCLPointCloud2::Ptr cloud_full,
+                            pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_xyz,
+                            std::string& out_pcd_path)
+{
+    if (!file_exists(filename))
+    {
+        std::cerr << "Input file does not exist: " << filename << "\n";
+        return false;
+    }
+
+    const std::string ext = get_ext(filename);
+    std::string pcdPath;
+
+    if (ext == ".pcd")
+    {
+        pcdPath = filename;
+    }
+    else if (ext == ".las" || ext == ".laz")
+    {
+        pcdPath = replace_ext(filename, ".pcd");
+        if (!ensure_pcd_from_las(filename, pcdPath))
+            return false;
+    }
+    else
+    {
+        std::cerr << "Unsupported extension: " << ext << " (expected .pcd/.las/.laz)\n";
+        return false;
+    }
+
+    pcl::PCDReader reader;
+    if (reader.read(pcdPath, *cloud_full) < 0)
+    {
+        std::cerr << "Error reading PCD: " << pcdPath << "\n";
+        return false;
+    }
+
+    pcl::fromPCLPointCloud2(*cloud_full, *cloud_xyz);
+
+    out_pcd_path = pcdPath;
+    std::cout << "Loaded PCD(full fields): " << pcdPath
+              << " (pts=" << cloud_xyz->size() << ")\n";
+
+    // Helpful: print available fields
+    std::cout << "Fields in PCD: ";
+    for (const auto& f : cloud_full->fields) std::cout << f.name << " ";
+    std::cout << "\n";
+
     return true;
 }
 
@@ -60,113 +175,61 @@ int main()
     const std::string out_dir = "out_cluster";
     ensure_dir(out_dir);
 
-    // ----------------------------------------------------------------------
-    // INPUT: this should be NON-GROUND point cloud produced by your RANSAC app
-    // Example: out_ground/nonground_leaf20cm_dist08cm_FINAL.pcd
-    // ----------------------------------------------------------------------
-    const std::string input_nonground_pcd =
-        "./out_ground/nonground_leaf22cm_dist10cm_FINAL.pcd";  // <-- change to your file
+    const std::string input_nonground =
+        "./out_ground/2025-07-15-MS_Vinograd_1_classified_smrf_non_ground.las";
 
-    // Save downsampled variants (optional) + clusters
-    const bool SAVE_DOWNSAMPLED = true;
-    const bool SAVE_CLUSTERS    = true;
+    const bool SAVE_CLUSTERS = true;
 
-    // Parameter sweep
-    std::vector<float> leaf_sizes         = {0.00f}; // 0.00 means "no voxel at all"
-    std::vector<float> cluster_tolerances = {0.05f, 0.1f, 0.3f, 0.6f, 0.8f, 1.0f, 1.5f, 2.0f};
+    std::vector<float> leaf_sizes         = {0.00f};  
+    std::vector<float> cluster_tolerances = {0.4f};
 
-    // Clustering constraints (adjust for your vineyard density)
-    const int MIN_CLUSTER_SIZE = 100;
-    const int MAX_CLUSTER_SIZE = 450000;
+    const int MIN_CLUSTER_SIZE = 50000;
+    const int MAX_CLUSTER_SIZE = 850000;
 
-    // Log
     std::ofstream log(out_dir + "/clustering_only_log.csv", std::ios::out);
-    log << "timestamp,config_id,leaf_m,tol_m,"
-           "input_pts,voxel_pts,clusters,valid,reason,"
-           "voxel_s,cluster_s,total_s,"
-           "input_file,downsample_file\n";
+    log << "timestamp,config_id,leaf_m,tol_m,input_pts,clusters,valid,reason,input_file\n";
 
-    pcl::PointCloud<pcl::PointXYZ>::Ptr input(new pcl::PointCloud<pcl::PointXYZ>);
-    if (!loadPCD(input_nonground_pcd, input))
+    pcl::PCLPointCloud2::Ptr input_full(new pcl::PCLPointCloud2);
+    pcl::PointCloud<pcl::PointXYZ>::Ptr input_xyz(new pcl::PointCloud<pcl::PointXYZ>);
+    std::string input_pcd_path;
+
+    if (!loadPCDWithAttrs(input_nonground, input_full, input_xyz, input_pcd_path))
         return -1;
-
-    pcl::PCDWriter writer;
 
     int config_id = 0;
     const auto global_start = std::chrono::high_resolution_clock::now();
 
     for (float leaf : leaf_sizes)
     {
-        // 1) Optional voxel downsample
-        pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_work(new pcl::PointCloud<pcl::PointXYZ>);
-        double voxel_s = 0.0;
 
         if (leaf > 0.0f)
         {
-            auto t0 = std::chrono::high_resolution_clock::now();
-
-            pcl::VoxelGrid<pcl::PointXYZ> vg;
-            vg.setInputCloud(input);
-            vg.setLeafSize(leaf, leaf, leaf);
-            vg.filter(*cloud_work);
-
-            auto t1 = std::chrono::high_resolution_clock::now();
-            voxel_s = std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count() / 1000.0;
-
-            std::cout << "\n[VOXEL] leaf=" << leaf
-                      << " | " << input->size() << " -> " << cloud_work->size()
-                      << " pts | " << voxel_s << " s\n";
-        }
-        else
-        {
-            *cloud_work = *input; // no voxel
-            std::cout << "\n[VOXEL] leaf=0 (disabled) | pts=" << cloud_work->size() << "\n";
-        }
-
-        if (cloud_work->size() < 100)
-        {
-            std::cout << "Too few points, skip leaf.\n";
+            std::cerr << "leaf>0 not supported in this version (would break attribute indexing). Use leaf=0.\n";
             continue;
         }
 
-        std::string downsample_file = "";
-        if (SAVE_DOWNSAMPLED && leaf > 0.0f)
+        pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_work_xyz(new pcl::PointCloud<pcl::PointXYZ>);
+        pcl::PCLPointCloud2::Ptr cloud_work_full(new pcl::PCLPointCloud2);
+
+        *cloud_work_xyz  = *input_xyz;
+        *cloud_work_full = *input_full;
+
+        if (cloud_work_xyz->size() < 100)
         {
-            downsample_file = out_dir + "/cluster_input_leaf" + cmTag(leaf) + ".pcd";
-            std::cout << "[Save] " << downsample_file << "\n";
-            writer.write<pcl::PointXYZ>(downsample_file, *cloud_work, true);
+            std::cout << "Too few points, skip.\n";
+            continue;
         }
 
-        // Build kd-tree ONCE per leaf
         pcl::search::KdTree<pcl::PointXYZ>::Ptr tree(new pcl::search::KdTree<pcl::PointXYZ>);
-        tree->setInputCloud(cloud_work);
+        tree->setInputCloud(cloud_work_xyz);
 
         for (float tol : cluster_tolerances)
         {
             config_id++;
 
-            // Guard: too-large tolerance vs spacing can explode runtime
-            if (leaf > 0.0f && tol > 8.0f * leaf)
-            {
-                log << nowIso8601() << "," << config_id << ","
-                    << leaf << "," << tol << ","
-                    << input->size() << "," << cloud_work->size() << ","
-                    << 0 << "," << 0 << ","
-                    << "skip_tol_vs_leaf,"
-                    << voxel_s << ",0,0,"
-                    << input_nonground_pcd << "," << downsample_file << "\n";
-                log.flush();
-
-                std::cout << "[Skip] config" << config_id
-                          << " tol=" << tol << " too large vs leaf=" << leaf << "\n";
-                continue;
-            }
-
-            std::cout << "\n---------------------------------------------\n";
-            std::cout << "CONFIG " << config_id
+            std::cout << "\nCONFIG " << config_id
                       << " | leaf=" << leaf
                       << " | tol=" << tol << "\n";
-            std::cout << "---------------------------------------------\n";
 
             auto c0 = std::chrono::high_resolution_clock::now();
 
@@ -176,62 +239,61 @@ int main()
             ec.setMinClusterSize(MIN_CLUSTER_SIZE);
             ec.setMaxClusterSize(MAX_CLUSTER_SIZE);
             ec.setSearchMethod(tree);
-            ec.setInputCloud(cloud_work);
+            ec.setInputCloud(cloud_work_xyz);
             ec.extract(cluster_indices);
 
             auto c1 = std::chrono::high_resolution_clock::now();
             double cluster_s =
                 std::chrono::duration_cast<std::chrono::milliseconds>(c1 - c0).count() / 1000.0;
 
-            const bool valid = (cluster_indices.size() <= 30);
+            const bool valid = (cluster_indices.size() <= 50);
             const std::string reason = valid ? "ok" : "too_many_clusters";
 
             std::cout << "clusters=" << cluster_indices.size()
                       << " | time=" << cluster_s << " s"
                       << (valid ? " | VALID\n" : " | INVALID\n");
 
-            // Save clusters
             if (SAVE_CLUSTERS && valid)
             {
+                pcl::PCDWriter writer2;
                 int j = 0;
+
                 for (const auto& cl : cluster_indices)
                 {
-                    pcl::PointCloud<pcl::PointXYZ>::Ptr cluster(new pcl::PointCloud<pcl::PointXYZ>);
-                    cluster->points.reserve(cl.indices.size());
+                    pcl::PointIndices::Ptr inds(new pcl::PointIndices(cl));
 
-                    for (int idx : cl.indices)
-                        cluster->points.push_back((*cloud_work)[idx]);
-
-                    cluster->width = static_cast<uint32_t>(cluster->size());
-                    cluster->height = 1;
-                    cluster->is_dense = true;
+                    pcl::PCLPointCloud2 cluster_full;
+                    pcl::ExtractIndices<pcl::PCLPointCloud2> ex;
+                    ex.setInputCloud(cloud_work_full);
+                    ex.setIndices(inds);
+                    ex.setNegative(false);
+                    ex.filter(cluster_full);
 
                     std::ostringstream ss;
                     ss << out_dir << "/config" << config_id
                        << "_leaf" << cmTag(leaf)
                        << "_tol" << cmTag(tol)
                        << "_cluster_" << std::setw(2) << std::setfill('0') << j << ".pcd";
-                    writer.write<pcl::PointXYZ>(ss.str(), *cluster, true);
+
+                    writer2.writeBinary(ss.str(), cluster_full);
                     ++j;
                 }
             }
 
-            auto now = std::chrono::high_resolution_clock::now();
-            double total_s =
-                std::chrono::duration_cast<std::chrono::milliseconds>(now - global_start).count() / 1000.0;
-
             log << nowIso8601() << "," << config_id << ","
                 << leaf << "," << tol << ","
-                << input->size() << "," << cloud_work->size() << ","
+                << cloud_work_xyz->size() << ","
                 << cluster_indices.size() << ","
                 << (valid ? 1 : 0) << ","
                 << reason << ","
-                << voxel_s << "," << cluster_s << "," << total_s << ","
-                << input_nonground_pcd << "," << downsample_file << "\n";
+                << input_pcd_path << "\n";
             log.flush();
         }
     }
 
-    std::cout << "\nDone. Log: " << out_dir + "/clustering_only_log.csv" << "\n";
+    auto now = std::chrono::high_resolution_clock::now();
+    double total_s =
+        std::chrono::duration_cast<std::chrono::milliseconds>(now - global_start).count() / 1000.0;
+    std::cout << "\nDone in " << total_s << " s. Log: " << out_dir + "/clustering_only_log.csv" << "\n";
     return 0;
 }

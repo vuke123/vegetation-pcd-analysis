@@ -1,15 +1,12 @@
-"""
-Visualize PCL clustering results (original, downsampled, nonground, clusters).
-Run after executing your C++ program.
-"""
-
 import open3d as o3d
 import numpy as np
 import glob
 import os
+import csv
 
 
-OUT_DIR = "out"
+OUT_DIR = "out_ground"
+CLUSTER_DIR = "out_cluster"
 
 
 def load_pcd(filepath):
@@ -38,6 +35,35 @@ def choose_file(pattern, title="Choose a file"):
     idx = int(sel) - 1
     if 0 <= idx < len(files):
         return files[idx]
+    return None
+
+
+def load_ground_removal_stats(nonground_path):
+    log_path = os.path.join(OUT_DIR, "ground_removal_log.csv")
+    if not os.path.exists(log_path):
+        return None
+
+    target = os.path.normpath(nonground_path)
+
+    with open(log_path, "r", newline="") as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            row_path = os.path.normpath(row.get("nonground_file", ""))
+            if row_path == target:
+                try:
+                    orig_pts = int(row["orig_pts"])
+                    voxel_pts = int(row["voxel_pts"])
+                    total_removed = int(row["total_removed"])
+                    final_nonground = int(row["final_nonground"])
+                except (KeyError, ValueError):
+                    return None
+                return {
+                    "orig_pts": orig_pts,
+                    "voxel_pts": voxel_pts,
+                    "total_removed": total_removed,
+                    "final_nonground": final_nonground,
+                }
+
     return None
 
 
@@ -76,7 +102,7 @@ def visualize_nonground():
     print("3. NON-GROUND POINT CLOUD (after RANSAC ground removal)")
     print("="*60)
 
-    pattern = os.path.join(OUT_DIR, "nonground_leaf*cm_dist*cm.pcd")
+    pattern = os.path.join(OUT_DIR, "nonground_leaf*cm_dist*cm*.pcd")
     filepath = choose_file(pattern, title="Pick a non-ground cloud (leaf/dist)")
     if not filepath:
         return
@@ -84,8 +110,25 @@ def visualize_nonground():
     pcd = load_pcd(filepath)
     if pcd is None:
         return
+
+    stats = load_ground_removal_stats(filepath)
+    window_title = "Non-Ground (after RANSAC)"
+    if stats:
+        orig = stats["orig_pts"]
+        removed = stats["total_removed"]
+        remaining = stats["final_nonground"]
+        ratio = (removed / orig * 100.0) if orig > 0 else 0.0
+        print(
+            f"Ground removal stats: orig={orig}, removed={removed}, "
+            f"remaining={remaining} ({ratio:.1f}% removed)"
+        )
+        window_title = (
+            f"Non-Ground (removed {removed}/{orig} pts, "
+            f"{ratio:.1f}% of original)"
+        )
+
     pcd.paint_uniform_color([0.2, 0.8, 0.4])
-    o3d.visualization.draw_geometries([pcd], window_name="Non-Ground (after RANSAC)")
+    o3d.visualization.draw_geometries([pcd], window_name=window_title)
 
 
 def visualize_clusters():
@@ -93,12 +136,12 @@ def visualize_clusters():
     print("4. CLUSTERS (by config id)")
     print("="*60)
 
-    config = input("Enter config id (1-27): ").strip()
+    config = input("Enter config id (integer): ").strip()
     if not config.isdigit():
         print("Invalid config id.")
         return
 
-    pattern = os.path.join(OUT_DIR, f"config{config}_cluster_*.pcd")
+    pattern = os.path.join(CLUSTER_DIR, f"config{config}_leaf*.pcd")
     cluster_files = sorted(glob.glob(pattern))
     if not cluster_files:
         print(f"No cluster files found for config {config}. Expected: {pattern}")
@@ -123,7 +166,7 @@ def visualize_comparison():
     print("5. COMPARISON (Original vs Non-ground vs Clusters)")
     print("="*60)
 
-    config = input("Enter config id (1-27) for clusters (optional, Enter to skip clusters): ").strip()
+    config = input("Enter config id for clusters (optional, Enter to skip clusters): ").strip()
 
     geoms = []
 
@@ -137,18 +180,22 @@ def visualize_comparison():
         width = 5.0
 
     # Non-ground: let user pick a leaf/dist file
-    ng_file = choose_file(os.path.join(OUT_DIR, "nonground_leaf*cm_dist*cm.pcd"),
+    ng_file = choose_file(os.path.join(OUT_DIR, "nonground_leaf*cm_dist*cm*.pcd"),
                           title="Pick non-ground cloud for comparison")
+    stats = None
     if ng_file:
         ng = load_pcd(ng_file)
         if ng:
             ng.paint_uniform_color([0.2, 0.8, 0.4])
             ng.translate([width * 1.2, 0, 0])
             geoms.append(ng)
+            stats = load_ground_removal_stats(ng_file)
 
     # Clusters: optional
     if config.isdigit():
-        cluster_files = sorted(glob.glob(os.path.join(OUT_DIR, f"config{config}_cluster_*.pcd")))
+        cluster_files = sorted(
+            glob.glob(os.path.join(CLUSTER_DIR, f"config{config}_leaf*.pcd"))
+        )
         if cluster_files:
             np.random.seed(42)
             colors = np.random.rand(len(cluster_files), 3) * 0.7 + 0.3
@@ -160,14 +207,29 @@ def visualize_comparison():
                     geoms.append(pcd)
 
     if geoms:
-        print("Left: Original | Middle: Non-ground | Right: Clusters (optional)")
-        o3d.visualization.draw_geometries(geoms, window_name="Comparison")
+        window_title = "Comparison"
+        if stats:
+            orig = stats["orig_pts"]
+            removed = stats["total_removed"]
+            remaining = stats["final_nonground"]
+            ratio = (removed / orig * 100.0) if orig > 0 else 0.0
+            print(
+                f"Ground removal stats: orig={orig}, removed={removed}, "
+                f"remaining={remaining} ({ratio:.1f}% removed)"
+            )
+            window_title = (
+                f"Comparison (removed {removed}/{orig} pts, "
+                f"{ratio:.1f}% of original)"
+            )
 
+        print("Left: Original | Middle: Non-ground | Right: Clusters (optional)")
+        o3d.visualization.draw_geometries(geoms, window_name=window_title)
 
 def main():
     print("="*60)
     print("PCL Clustering Visualization")
-    print(f"Using output directory: {OUT_DIR}")
+    print(f"Using ground output directory: {OUT_DIR}")
+    print(f"Using cluster output directory: {CLUSTER_DIR}")
     print("="*60)
 
     while True:
