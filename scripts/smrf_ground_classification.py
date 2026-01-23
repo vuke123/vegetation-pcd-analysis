@@ -246,6 +246,7 @@ def visualize_before_after(
     pcd_original = _las_to_o3d_point_cloud(original_las, (0.8, 0.8, 0.8))
     pcd_non_ground = _las_to_o3d_point_cloud(non_ground_las, (0.2, 0.4, 0.9))
 
+    # First view: original vs non-ground (overlay)
     print("Showing overlay: original (gray) and non-ground (blue)...")
     o3d.visualization.draw_geometries([
         pcd_original,
@@ -255,10 +256,12 @@ def visualize_before_after(
     if ground_las is not None and Path(ground_las).is_file():
         pcd_ground = _las_to_o3d_point_cloud(ground_las, (0.6, 0.3, 0.1))
 
+        # Translate one cloud so both appear side by side
         bbox = pcd_non_ground.get_axis_aligned_bounding_box()
         extent = bbox.get_extent()[0]
         translate_vec = np.array([extent * 2.0, 0.0, 0.0])
 
+        # Shift non-ground cloud to the side relative to its current position
         pcd_non_ground_shifted = pcd_non_ground.translate(translate_vec)
 
         print("Showing side-by-side: ground (brown) vs non-ground (blue, shifted)...")
@@ -269,9 +272,11 @@ def visualize_before_after(
 
 
 if __name__ == "__main__":
+    # Example usage; adjust paths as needed.
     example_input = "../datasource/2025-07-15-MS_Vinograd_1.las"
     output_directory = "./out_ground"
 
+    # 1) Run SMRF classification
     classified = run_smrf_classification(
         example_input,
         out_dir=output_directory,
@@ -283,7 +288,9 @@ if __name__ == "__main__":
         },
     )
 
+    # 2) Split into ground and non-ground and print stats
     ground_file, non_ground_file = split_ground_non_ground(classified, output_directory)
 
+    # 3) Visualize
     visualize_before_after(example_input, non_ground_file, ground_file)
 

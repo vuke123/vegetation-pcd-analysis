@@ -22,7 +22,7 @@
 
 static void ensure_dir(const std::string& path)
 {
-    ::mkdir(path.c_str(), 0755); 
+    ::mkdir(path.c_str(), 0755); // ignores "already exists"
 }
 
 static std::string nowIso8601()
@@ -88,12 +88,14 @@ static std::string replace_ext(const std::string& p, const std::string& newExt)
     return p.substr(0, dot) + newExt;
 }
 
+// Convert LAS/LAZ to PCD, ensuring Red + Infrared fields are present
 static bool ensure_pcd_from_las(const std::string& lasPath, const std::string& pcdPath)
 {
     bool needConvert = true;
 
     if (file_exists(pcdPath))
     {
+        // Don’t trust only mtime; also require non-trivial size
         if (file_mtime(pcdPath) >= file_mtime(lasPath) && file_size(pcdPath) > 200)
             needConvert = false;
     }
@@ -180,7 +182,7 @@ int main()
 
     const bool SAVE_CLUSTERS = true;
 
-    std::vector<float> leaf_sizes         = {0.00f};  
+    std::vector<float> leaf_sizes         = {0.00f};  // keep 0 for now
     std::vector<float> cluster_tolerances = {0.4f};
 
     const int MIN_CLUSTER_SIZE = 50000;
@@ -201,7 +203,8 @@ int main()
 
     for (float leaf : leaf_sizes)
     {
-
+        // NOTE: leaf>0 voxel downsample not implemented for full cloud here.
+        // Keep leaf=0 to preserve 1:1 indexing between full and xyz.
         if (leaf > 0.0f)
         {
             std::cerr << "leaf>0 not supported in this version (would break attribute indexing). Use leaf=0.\n";
@@ -220,6 +223,7 @@ int main()
             continue;
         }
 
+        // KD-tree on XYZ
         pcl::search::KdTree<pcl::PointXYZ>::Ptr tree(new pcl::search::KdTree<pcl::PointXYZ>);
         tree->setInputCloud(cloud_work_xyz);
 

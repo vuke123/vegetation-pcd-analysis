@@ -27,6 +27,7 @@ def _pcd_to_dataframe_all_fields(pcd_path: str) -> pd.DataFrame:
     if not fields:
         raise ValueError("PCD has no fields?")
 
+    # Best path: structured array (named columns + proper dtypes) if available
     pc_data = getattr(pc, "pc_data", None)
     if pc_data is not None and getattr(pc_data.dtype, "names", None):
         df = pd.DataFrame({name: pc_data[name] for name in pc_data.dtype.names})
@@ -34,6 +35,7 @@ def _pcd_to_dataframe_all_fields(pcd_path: str) -> pd.DataFrame:
         print(f"Points: {len(df):,}")
         return df
 
+    # Fallback: plain NxF array
     arr = pc.numpy(fields)
     df = pd.DataFrame(arr, columns=fields)
     print("Fields:", list(df.columns))
@@ -86,18 +88,22 @@ def export_filtered_las(df: pd.DataFrame, las_template: laspy.LasData, output_pa
     if n == 0:
         raise ValueError("DataFrame is empty")
 
+    # ---- FIX: copy header but allocate output for n points (NOT template point count) ----
     hdr = las_template.header.copy()
     hdr.point_count = n
+    # keep it consistent
     hdr.number_of_points_by_return = [0] * len(hdr.number_of_points_by_return)
 
     out = laspy.LasData(hdr)
     out.points = laspy.ScaleAwarePointRecord.zeros(n, header=hdr)
     # -------------------------------------------------------------------------------
 
+    # set XYZ (laspy will scale/offset using hdr)
     out.x = df[x_col].to_numpy(np.float64, copy=False)
     out.y = df[y_col].to_numpy(np.float64, copy=False)
     out.z = df[z_col].to_numpy(np.float64, copy=False)
 
+    # helper to set a dim or create extra bytes
     dim_names = set(out.point_format.dimension_names)
 
     def set_or_extra(name: str, values: np.ndarray, dtype):
@@ -105,6 +111,7 @@ def export_filtered_las(df: pd.DataFrame, las_template: laspy.LasData, output_pa
         if lname in dim_names:
             setattr(out, lname, values.astype(dtype, copy=False))
             return
+        # LAS 1.4 NIR dim in laspy is usually "nir"
         if lname == "infrared" and "nir" in dim_names:
             out.nir = values.astype(dtype, copy=False)
             return
@@ -113,6 +120,7 @@ def export_filtered_las(df: pd.DataFrame, las_template: laspy.LasData, output_pa
             dim_names.add(lname)
         setattr(out, lname, values.astype(dtype, copy=False))
 
+    # copy red / infrared and ndvi
     if "red" in df.columns:
         red = np.clip(df["red"].to_numpy(np.float64, copy=False), 0, 65535).astype(np.uint16)
         set_or_extra("red", red, np.uint16)
@@ -124,6 +132,7 @@ def export_filtered_las(df: pd.DataFrame, las_template: laspy.LasData, output_pa
     if "ndvi" in df.columns:
         set_or_extra("ndvi", df["ndvi"].to_numpy(np.float32, copy=False), np.float32)
 
+    # optional fields (safe + clipped)
     for col, dtype in [
         ("intensity", np.uint16),
         ("classification", np.uint8),
@@ -152,18 +161,23 @@ def main():
     ap.add_argument("--out-las", required=True, help="Output LAS path")
     args = ap.parse_args()
 
+    # Read template LAS
     template_path = Path(args.template_las)
     if not template_path.is_file():
         raise FileNotFoundError(f"Template LAS not found: {template_path}")
     las_template = laspy.read(str(template_path))
 
+    # Load PCD -> DF
     df = _pcd_to_dataframe_all_fields(args.pcd)
 
+    # Ensure required columns exist
     if "red" not in df.columns or "infrared" not in df.columns:
         raise KeyError(f"PCD DF must contain 'red' and 'infrared'. Columns: {list(df.columns)}")
 
+    # NDVI
     df = add_ndvi(df, red_col="red", nir_col="infrared", out_col="ndvi")
 
+    # Export LAS
     export_filtered_las(df, las_template, args.out_las)
 
 
