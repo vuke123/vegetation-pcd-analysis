@@ -1,0 +1,6 @@
+# Python dependencies for vineyard pipeline
+numpy
+pandas
+pyarrow
+laspy[laszip]
+pypcd4
