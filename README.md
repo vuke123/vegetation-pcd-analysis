@@ -1,42 +1,54 @@
-# Vegetation-Metrics-Estimation
-Estimation of NDVI indexes and volume in vegetation (vineyards and olive trees)
+# Vegetation Point Cloud Analysis
 
-Step 1) : 
+> Automated pipeline for extracting vegetation metrics from multispectral LiDAR point clouds
 
-Idea : Load data and try to segment the plants using instance segmentation with DBSCAN to extract the parts of the point cloud that correspond to plants.
+![Landing Page](images/landing_page.png)
 
-Current state : Found the way to transform point cloud to image format but needs to convert cloud to 3chanel rgb because currently is just rasterized over z axis and doesn't contain information about color.
-(pcd_to_jpg.ipynb file).
+## Overview
 
-Step 2): 
+This project processes multispectral LiDAR data to extract quantitative metrics from agricultural vegetation (vineyards, olive groves). The pipeline handles ground removal, plant segmentation, volume estimation, and NDVI calculation.
 
-Idea : Ground removal 
+## Pipeline
 
-Current state : Can be done with RANSAC ground segmentation (currently implemented in code but the result isn't optimal and doesn't satisfy needs). Easier approach is to use height over ground feature from CloudCompare tool.
+### Ground Removal
+SMRF-based ground classification to isolate vegetation from terrain.
 
-Step 3) : 
+![Ground Removed](images/ground_removed.png)
 
- 
-Idea : Display differences between LIDAR, IR and MS point cloud.
-Voxelize object for robust volume calculation. 
+### Clustering & Segmentation
+DBSCAN-based instance segmentation to identify individual plants from point clouds.
 
-Current state: 
+![Clustering](images/clustering.png)
 
-Voxelized manually extracted (CloudCompare + height over ground filtering) plants. 
-Done with custom code and also with Open3D 0.19.0. library.
-(read_plot_voxelization.ipynb) 
+### Volume Estimation
+- Voxelization for robust approximation
+- Slicing method for detailed measurements
+- Open3D integration for 3D processing
 
-Step 4) : 
+### NDVI Calculation
+Multispectral band processing to compute vegetation indices, exported as GeoTIFF for GIS analysis.
 
-Idea : Volume calculation. Through voxelization for robust and aproximative method and slicing method for more detailed version.
+## Tech Stack
 
-Current state : 
+- **Point Cloud Processing**: Open3D, laspy
+- **Clustering**: DBSCAN, scikit-learn
+- **Geospatial**: GDAL, rasterio
+- **Deployment**: Azure Batch (containerized pipeline)
 
-Both logic are implemented. Just need data with local coordinates so I can compute volume in correct metrics. Afterwards, I should know if my implementations work fine. 
-(volume_calculation.ipynb)
+## Structure
 
-Step 5) : 
+```
+├── scripts/          # Core processing modules
+├── azure_platform/   # Cloud deployment configs
+└── images/           # Pipeline visualizations
+```
 
-Idea : NDVI indexes calculation 
+## Usage
 
-Current state : In development. Saving GeoTIFF file after computation and visualizing it in QGIS Desktop (rasterizing.ipynb).
+Run the full pipeline via Azure Batch:
+```bash
+cd azure_platform
+./run_all.sh
+```
+
+Or execute individual stages locally from `scripts/`.
