@@ -23,34 +23,6 @@ The overall data flow is:
 
 ---
 
-## Visual Overview
-
-### Whole Vineyard Scene
-
-A full vineyard point cloud visualized in CloudCompare.
-
-![Whole Vineyard Point Cloud](images/vineyard.png)
-
-### Ground Removal
-
-Ground classification removes terrain points and isolates vegetation for downstream processing.
-
-![Removed Ground from the Field](images/ground_removed.png)
-
-### Clustered Vineyard Rows
-
-After filtering, the point cloud is segmented into vegetation clusters representing vineyard rows or plant groups.
-
-![Clustered Vineyard Rows](images/clustering.png)
-
-### Height Above Ground Example
-
-CloudCompare visualization of an olive tree colored by height above ground.
-
-![Olive Tree Height Above Ground](images/olive.png)
-
----
-
 ## Pipeline
 
 ### Ground Removal
@@ -292,6 +264,9 @@ Examples:
 - comparison of multiple volume estimation strategies
 - visualization of processed Parquet outputs
 - exploration of learning-based point cloud models
+
+
+![Olive Tree Height Above Ground](images/olive.png)
 
 ---
 
