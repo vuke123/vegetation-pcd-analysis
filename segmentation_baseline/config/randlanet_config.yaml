@@ -1,0 +1,85 @@
+# ============================================================================
+# RandLA-Net semantic segmentation — baseline configuration
+#
+# This config drives dataset preparation, training, inference, and evaluation.
+# Paths are relative to the segmentation_baseline/ directory unless absolute.
+# ============================================================================
+
+# --- Semantic classes --------------------------------------------------
+# 0 is always unlabeled / ignored during training.
+classes:
+  0: unlabeled
+  1: vine_row
+  2: olive_tree
+  3: other
+
+num_classes: 3            # excludes unlabeled (class 0)
+ignored_label_index: 0    # label id to ignore in loss / metrics
+
+# --- Point-cloud features ---------------------------------------------
+# Which per-point attributes to feed to the network, beyond XYZ.
+# Available modes (choose one or define a custom list):
+#   xyz              — coordinates only
+#   xyz_ndvi         — coordinates + NDVI
+#   xyz_rgb_nir      — coordinates + RGB + near-infrared
+#   xyz_rgb_nir_ndvi_intensity — full feature set
+#
+# Or specify an explicit list under 'feature_list'.
+feature_mode: xyz_ndvi
+
+# Explicit override (takes precedence over feature_mode if set):
+# feature_list:
+#   - x
+#   - y
+#   - z
+#   - ndvi
+#   - intensity
+
+# --- Input / output paths -----------------------------------------------
+data:
+  raw_dir: data/raw               # raw LAS/LAZ files (unlabeled or labeled)
+  tile_dir: data/tiles            # prepared tile .npy files
+  split_dir: data/splits          # train.txt / val.txt / test.txt
+
+  # If labels exist, they should be in a per-point 'classification' or
+  # 'label' dimension inside the LAS file, or in a sidecar .npy.
+
+output:
+  checkpoint_dir: output/checkpoints
+  predictions_dir: output/predictions
+  logs_dir: output/logs
+
+# --- Tiling / block extraction ------------------------------------------
+tiling:
+  block_size: 10.0          # metres; each tile is block_size x block_size in XY
+  overlap: 2.0              # metres; overlap between adjacent tiles
+  max_points_per_tile: 65536 # subsample if tile exceeds this
+  min_points_per_tile: 128   # discard tiles with fewer points
+  grid_sub_size: 0.04        # optional voxel subsampling within each tile (m)
+
+# --- RandLA-Net model ---------------------------------------------------
+model:
+  name: RandLA-Net
+  num_layers: 4
+  num_points: 65536           # points fed per forward pass
+  num_neighbors: 16           # k for k-NN in each layer
+  sub_sampling_ratio: [4, 4, 4, 4]
+  d_feature: 8               # input feature dimension (set automatically from feature config)
+  d_out: [16, 64, 128, 256]  # per-layer output dimensions
+
+# --- Training ------------------------------------------------------------
+training:
+  epochs: 100
+  batch_size: 4
+  learning_rate: 0.001
+  lr_scheduler: cosine        # cosine | step | none
+  weight_decay: 0.0001
+  class_weights: auto         # auto (inverse frequency) or explicit list
+  val_interval: 5             # validate every N epochs
+  early_stopping_patience: 15
+
+# --- Inference -----------------------------------------------------------
+inference:
+  checkpoint: output/checkpoints/best_model.pth
+  batch_size: 8
+  vote_rounds: 1              # number of inference passes to average (test-time augment)
