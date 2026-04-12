@@ -13,12 +13,12 @@ OUT_CLUSTER_DIR="./out_cluster"
 OUT_CLUSTER_LAS_DIR="./out_cluster_las"
 FINAL_LAS="$OUT_CLUSTER_LAS_DIR/merged_clusters_ndvi.las"
 
-echo "=== [0/5] Cleaning output folders (out_ground, out_cluster, out_cluster_las) ==="
+echo "=== [0/6] Cleaning output folders (out_ground, out_cluster, out_cluster_las) ==="
 rm -rf -- "$OUT_GROUND_DIR"/* "$OUT_GROUND_DIR"/.[!.]* "$OUT_GROUND_DIR"/..?* 2>/dev/null || true
 rm -rf -- "$OUT_CLUSTER_DIR"/* "$OUT_CLUSTER_DIR"/.[!.]* "$OUT_CLUSTER_DIR"/..?* 2>/dev/null || true
 rm -rf -- "$OUT_CLUSTER_LAS_DIR"/* "$OUT_CLUSTER_LAS_DIR"/.[!.]* "$OUT_CLUSTER_LAS_DIR"/..?* 2>/dev/null || true
 
-echo "=== [1/5] Running SMRF ground classification (Python) ==="
+echo "=== [1/6] Running SMRF ground classification (Python) ==="
 NON_GROUND_LAS=$(
   INPUT_LAS="$INPUT_LAS" OUT_GROUND_DIR="$OUT_GROUND_DIR" \
   python3 - << 'PY'
@@ -49,13 +49,13 @@ PY
 )
 echo "Non-ground LAS: ${NON_GROUND_LAS}"
 
-echo "=== [2/5] Building C++ targets (cmake --build build -j) ==="
+echo "=== [2/6] Building C++ targets (cmake --build build -j) ==="
 cmake --build build -j
 
-echo "=== [3/5] Running clustering_only (C++) ==="
+echo "=== [3/6] Running clustering_only (C++) ==="
 NON_GROUND_LAS="$NON_GROUND_LAS" ./build/clustering_only
 
-echo "=== [4/5] Computing NDVI LAS for each cluster PCD ==="
+echo "=== [4/6] Computing NDVI LAS for each cluster PCD ==="
 mkdir -p "$OUT_CLUSTER_LAS_DIR"
 shopt -s nullglob
 template_las="$NON_GROUND_LAS"
@@ -75,7 +75,7 @@ for pcd in "${cluster_pcds[@]}"; do
     --out-las "$out_las"
 done
 
-echo "=== [5/5] Merge clusters into one .LAS file ==="
+echo "=== [5/6] Merge clusters into one .LAS file ==="
 
 set -euo pipefail
 
@@ -86,3 +86,9 @@ set -euo pipefail
     --writers.las.minor_version=4 \
     *.las merged.las
 )
+
+echo "=== [6/6] Compute per-row features ==="
+python3 compute_row_features.py \
+  --in-dir "$OUT_CLUSTER_LAS_DIR" \
+  --source-las "$INPUT_LAS" \
+  --out "$OUT_CLUSTER_LAS_DIR/row_features.parquet"
