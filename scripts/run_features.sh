@@ -24,10 +24,11 @@ python3 compute_row_features.py \
   --source-las "$INPUT_LAS" \
   --out "$OUT_CLUSTER_LAS_DIR/row_features.parquet"
 
-echo "=== [7/7] Compute canopy structure metrics ==="
+echo "=== [7/7] Compute canopy structure metrics (segment-based) ==="
 python3 compute_canopy_structure.py \
   --in-dir "$OUT_CLUSTER_LAS_DIR" \
   --source-las "$INPUT_LAS" \
+  --segment-length 1.0 \
   --out "$OUT_CLUSTER_LAS_DIR/row_canopy_structure.parquet"
 
 echo "=== Done. Outputs: ==="
