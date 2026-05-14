@@ -1,0 +1,2 @@
+timestamp,config_id,leaf_m,tol_m,input_pts,clusters,valid,reason,input_file
+2026-04-25 23:35:59,1,0,0.4,885494,9,1,ok,./out_ground/2025-07-15-MS_Vinograd_1_classified_smrf_non_ground.pcd

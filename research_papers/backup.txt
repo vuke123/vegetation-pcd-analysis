@@ -1,0 +1,1633 @@
+\usepackage{tabularx}
+\usepackage{array}
+\documentclass[diplomskirad]{fer}
+% Dodaj opciju upload za generiranje konačne verzije koja se učitava na FERWeb
+% \documentclass[diplomskirad,upload]{fer}
+
+%--- PODACI O RADU / THESIS INFORMATION ----------------------------------------
+
+% Naslov na engleskom jeziku / Title in English
+\title{Estimation of Vegetation Indices Using Unmanned Aerial Vehicles}
+
+% Naslov na hrvatskom jeziku / Title in Croatian
+\naslov{Procjena vegetacijskih indeksa pomoću bespilotnih letjelica}
+
+% Broj rada / Thesis number
+\brojrada{205}
+
+% Autor / Author
+\author{Luka Vukelić}
+
+% Mentor
+\mentor{izv.\ prof.\ dr.\ sc.\ Matko Orsag}
+
+% Datum rada na engleskom jeziku / Date in English
+\date{June, 2026}
+
+% Datum rada na hrvatskom jeziku / Date in Croatian
+\datum{lipanj, 2026.}
+
+%-------------------------------------------------------------------------------
+
+\begin{document}
+
+% Naslovnica se automatski generira / Titlepage is automatically generated
+\maketitle
+
+
+%--- ZADATAK / THESIS ASSIGNMENT -----------------------------------------------
+
+% Upiši ime PDF datoteke preuzete s FERWeb-a
+\zadatak{hr_0036530728_86.pdf}
+
+
+%--- ZAHVALE / ACKNOWLEDGMENT --------------------------------------------------
+
+\begin{zahvale}
+  Zahvaljujem mentoru izv.\ prof.\ dr.\ sc.\ Matku Orsagu na stručnoj pomoći, savjetima i
+  usmjeravanju tijekom izrade diplomskog rada.
+
+  Također zahvaljujem obitelji i prijateljima na podršci tijekom studija i izrade rada.
+\end{zahvale}
+
+
+% Odovud započinje numeriranje stranica / Page numbering starts from here
+\mainmatter
+
+
+% Sadržaj se automatski generira / Table of contents is automatically generated
+\tableofcontents
+
+
+%--- UVOD ----------------------------------------------------------------------
+\chapter{Uvod}
+\label{pog:uvod}
+
+Globalno tržište poljoprivrednih dronova procijenjeno je na oko 2{,}6 milijardi USD u 2025.\ godini, a predviđa se da će do 2030.\ doseći više od 10 milijardi USD, uz godišnji rast veći od 30\,\% \cite{marketsandmarkets2025agdrones}. Taj ubrzani rast odraz je sve veće potrebe za preciznim, podatkovno utemeljenim pristupom upravljanju poljoprivrednom proizvodnjom. Istraživanja pritom pokazuju da pravodobna detekcija stresa i bolesti temeljena na podacima s dronova može povećati prinos za 15--30\,\% i smanjiti uporabu pesticida za oko 35\,\% \cite{guebsi2024drones,ferro2023precisionviticulture}.
+
+Takav je pristup posebno važan u vinogradarstvu, gdje prostorna varijabilnost nasada, utjecaj okolišnih čimbenika i potreba za brzim reagiranjem izravno utječu na kvalitetu i prinos. Bespilotne letjelice omogućuju brzo prikupljanje podataka visoke prostorne rezolucije - od razine pojedinih redova do dijelova krošnje - čime se otvara mogućnost preciznijeg praćenja vegetacijskog razvoja i uočavanja razlika unutar nasada \cite{guebsi2024drones,decastro2018vineyard3d}.
+
+U analizi vinograda posebno se izdvajaju dva pristupa. Prvi čine spektralne analize, kojima se iz multispektralnih snimaka izračunavaju vegetacijski indeksi poput NDVI-ja radi procjene vigora\footnote{Pod pojmom vigor u ovome radu misli se na vegetativnu bujnost, odnosno intenzitet rasta vinove loze, a ne na cjelokupno zdravstveno stanje biljke.} i općeg stanja vegetacije \cite{giovos2021viticultureVI}. Drugi pristup čine strukturne analize temeljene na 3D podacima, iz kojih se procjenjuju obilježja poput visine, širine, pokrovnosti i volumena krošnje \cite{decastro2018vineyard3d,escola2023canopy}. Sve se češće razmatraju i dodatni pokazatelji poput indeksa lisne površine (LAI) koji doprinose potpunijem opisu vegetacije \cite{comba2020lai}.
+Pouzdanost obiju skupina analiza uvelike ovisi o kvaliteti prethodne obrade podataka. Postupci segmentacije, izdvajanja redova i uklanjanja tla ključni su jer nepravilno uključivanje tla, sjena ili okolnih objekata može dovesti do pogrešnih procjena vegetacijskih i strukturnih pokazatelja \cite{han2024groundsegmentation,decastro2018vineyard3d}. Analiza po redovima pritom omogućuje detaljnije praćenje prostorne varijabilnosti te precizniju procjenu stanja pojedinih segmenata nasada \cite{decastro2018vineyard3d,escola2023canopy}.
+
+
+%--- TEORIJSKA PODLOGA ---------------------------------------------------------
+\chapter{Teorijska podloga}
+\label{pog:teorijska_podloga}
+
+\section{Daljinska istraživanja i precizna poljoprivreda}
+
+Ideja promatranja usjeva iz zraka nije nova -- već su se 1930-ih godina koristile
+aerofotografije za kartiranje poljoprivrednih površina. No tek je uvođenjem
+bespilotnih letjelica u poljoprivredu, koje je započelo 1980-ih u Japanu prvim
+bespilotnim helikopterima za raspršivanje sredstava, a ubrzalo se nakon 2010.\
+pojavom pristupačnih multikopterskih platformi, daljinsko istraživanje postalo
+dostupno na razini pojedinačnog reda ili čak pojedinačne biljke
+\cite{guebsi2024drones}. Dok satelitske snimke nude rezoluciju od 30~cm do
+nekoliko metara po pikselu, dron koji leti na 50--120~m visine daje slike s
+razlučivošću od svega 2--5~cm po pikselu -- dovoljno da se razlikuju pojedinačni
+listovi unutar krošnje vinove loze
+\cite{decastro2018vineyard3d,ferro2023precisionviticulture}.
+
+Ta razlika u razlučivosti ključna je za preciznu poljoprivredu, čiji je cilj da se
+odluke ne temelje na prosječnoj vrijednosti za cijelu parcelu, nego na prostorno
+promjenjivim uvjetima unutar nje. U nasadima vinove loze to je posebno izraženo:
+unutar istog vinograda mogu se pojaviti značajne razlike u bujnosti, zatvaranju
+sklopa, gustoći lisne mase i stanju tla. Bespilotne letjelice mogu nositi optičke,
+multispektralne, termalne pa čak i LiDAR senzore, čime pokrivaju i spektralnu i
+prostornu dimenziju analize vegetacije. Uz to, za razliku od satelita koji ovise o
+unaprijed zadanoj orbiti i vremenskim uvjetima, dron se može pokrenuti upravo
+onda kada je mjerenje potrebno -- primjerice neposredno prije ili nakon tretiranja
+nasada \cite{guebsi2024drones}.
+
+\section{Vegetacijski indeksi}
+
+Vegetacijski indeksi predstavljaju kombinacije spektralnih kanala kojima se nastoji
+naglasiti razlika između vegetacije i ostalih površina te procijeniti određena
+biofizička svojstva biljaka. Njihova osnovna ideja proizlazi iz činjenice da se
+vegetacija, tlo, voda, sjena i umjetni objekti razlikuju po spektralnom odazivu,
+odnosno po načinu na koji apsorbiraju i reflektiraju elektromagnetsko zračenje u pojedinim dijelovima spektra. Primjena NDVI metrika u poljoprivredi obuhvaća praćenje vitalnosti usjeva, precizno upravljanje gnojidbom i drugim ulaznim resursima, procjenu prinosa, analizu potrebe za navodnjavanjem te potporu pri odabiru i oplemenjivanju sjemenskog materijala.
+
+
+Među najpoznatijim i najšire korištenim vegetacijskim indeksima ističe se
+normalizirani diferencijski vegetacijski indeks, \engl{Normalized Difference
+Vegetation Index} (NDVI). Povijesno gledano, NDVI je razvijen u ranim fazama
+satelitskog daljinskog istraživanja kao odgovor na potrebu za jednostavnom i
+robustnom mjerom kojom bi se mogla izdvojiti vegetacija i ublažiti utjecaj promjena
+uvjeta opažanja, osobito razlika u solarnom zenitnom kutu. U literaturi se kao rani
+radovi koji su oblikovali ovaj pristup navode istraživanja krajem 1960-ih i početkom
+1970-ih, nakon čega NDVI postaje jedan od temeljnih pokazatelja vegetacije u
+multispektralnim satelitskim i zračnim snimkama.
+NDVI se računa iz reflektancije u crvenom i bliskom infracrvenom dijelu spektra prema
+izrazu
+\begin{equation}
+NDVI = \frac{NIR - Red}{NIR + Red},
+\label{eq:ndvi}
+\end{equation}
+gdje $Red$ označava reflektanciju u crvenom kanalu, a $NIR$ reflektanciju u bliskom
+infracrvenom kanalu. Zelena vegetacija snažno apsorbira crveni dio spektra zbog
+prisutnosti klorofila, dok istodobno snažno reflektira bliski infracrveni dio
+spektra zbog unutarnje strukture lista. Zbog toga više vrijednosti NDVI-a u pravilu
+upućuju na razvijeniju, gušću i fiziološki aktivniju vegetaciju.
+S matematičkog stajališta, NDVI je posebno zanimljiv jer ne predstavlja samo razliku
+dvaju spektralnih odziva, već njihovu normiranu kombinaciju. Ako se uvede omjer
+\begin{equation}
+S = \frac{NIR}{Red},
+\label{eq:simple_ratio}
+\end{equation}
+tada se izraz za NDVI može zapisati i u obliku
+\begin{equation}
+NDVI = \frac{S - 1}{S + 1}.
+\label{eq:ndvi_ratio_form}
+\end{equation}
+Iz toga se vidi da je NDVI povezan sa spektralnim omjerom $NIR/Red$, ali ima praktičnu
+prednost jer je omeđen na raspon vrijednosti od $-1$ do $1$. Takav zapis olakšava
+interpretaciju i usporedbu rezultata između različitih snimanja, senzora i lokacija.
+
+Iako je NDVI vrlo koristan i intuitivan pokazatelj, važno je naglasiti da on nije izravna mjera biomase, lisne površine ili prinosa. NDVI prije svega opisuje relativan odnos spektralnih svojstava vegetacije i stoga ga treba tumačiti u kontekstu vrste
+nasada, fenološke faze, geometrije snimanja, karakteristika senzora te provedene predobrade podataka. U gustoj vegetaciji može doći i do zasićenja indeksa, zbog čega se u određenim primjenama uz NDVI koriste i drugi vegetacijski indeksi, primjerice GNDVI ili NDRE.
+
+U ovom radu naglasak je stavljen na NDVI jer je izravno podržan raspoloživim
+multispektralnim podacima, jednostavan je za izračun, lako se interpretira i
+prikladan je za usporedbu stanja vegetacije između redova. Pritom je osobito važno da
+se indeks računa samo na točkama koje doista pripadaju vegetaciji, a ne na tlu, sjeni
+ili mješovitim rubnim područjima, čime se smanjuje utjecaj neželjenih spektralnih
+primjesa i povećava pouzdanost dobivenih rezultata.
+\section{Multispektralni, infracrveni i LiDAR podaci}
+
+Multispektralni podaci sastoje se od više spektralnih kanala, pri čemu svaki kanal
+opisuje reflektiranu ili emitiranu energiju u određenom dijelu elektromagnetskog
+spektra. Za razliku od klasične RGB snimke, multispektralni sustavi bilježe i kanale
+izvan vidljivog dijela spektra, primjerice blisko infracrveno područje, čime
+omogućuju detaljniju analizu svojstava promatrane površine. U daljinskim
+istraživanjima takvi su podaci osobito važni za praćenje vegetacije, promjena
+pokrova zemljišta i stanja usjeva.
+
+\begin{figure}[!htb]
+    \centering
+    \includegraphics[width=0.65\linewidth]{images/rgbvsms.png}
+    \caption{Usporedba RGB i multispektralnog prikaza iste poljoprivredne površine.}
+    \label{fig:rgb_vs_ms}
+\end{figure}
+
+U kontekstu analize vegetacijskih indeksa posebno su važni crveni i bliski
+infracrveni kanal. Zelena vegetacija snažno apsorbira crveni dio spektra zbog
+prisutnosti klorofila, dok istodobno snažno reflektira bliski infracrveni dio
+spektra zbog unutarnje strukture lista. Upravo se na toj spektralnoj razlici temelje
+poznati, već spomenuti, vegetacijski indeksi. Multispektralni podaci stoga ne služe samo za vizualni prikaz
+poljoprivredne površine, nego predstavljaju kvantitativnu osnovu za procjenu
+vitalnosti vegetacije, prostorne varijabilnosti usjeva i mogućih znakova stresa.
+
+Infracrveni podaci imaju posebno značenje u analizi vegetacije jer nose informaciju
+koju nije moguće izravno uočiti u vidljivom dijelu spektra. U užem smislu, blisko
+infracrveno područje često se koristi pri izračunu vegetacijskih indeksa, dok se šire
+infracrveno područje može koristiti i za druge oblike analize, primjerice procjenu
+toplinskih svojstava ili razlikovanje površina koje u vidljivom spektru izgledaju
+slično. Zbog toga infracrveni kanali predstavljaju važnu dopunu RGB prikazu i jedan
+su od ključnih razloga zbog kojih multispektralni senzori imaju veliku primjenu u
+preciznoj poljoprivredi.
+
+Za razliku od pasivnih optičkih senzora, LiDAR je aktivna metoda daljinskog
+istraživanja koja mjeri udaljenost između senzora i površine pomoću laserskih
+impulsa. Rezultat takvoga mjerenja najčešće je oblak točaka koji opisuje
+trodimenzionalnu geometriju scene. Osim koordinata, LiDAR točke mogu sadržavati i
+dodatne atribute kao što su intenzitet povrata, broj povrata, klasifikacija i druge
+informacije važne za obradu. Posebna prednost LiDAR-a jest mogućnost registracije
+višestrukih povrata istoga impulsa, pri čemu prvi povrati mogu opisivati vrhove
+vegetacije, a kasniji povrati niže slojeve krošnje ili tlo. Zbog toga je LiDAR vrlo
+prikladan za procjenu visine vegetacije, analizu strukture nasada, segmentaciju tla i
+volumetrijske procjene.
+
+Multispektralni i LiDAR podaci pritom se međusobno nadopunjuju. Multispektralni
+podaci primarno opisuju spektralna svojstva promatrane površine i omogućuju izračun
+vegetacijskih indeksa, dok LiDAR primarno opisuje prostornu strukturu i geometriju
+vegetacije. U primjenama vezanima uz poljoprivredu i snimanje iz drona njihova
+kombinacija omogućuje istodobnu analizu fiziološkog stanja biljaka i njihove
+trodimenzionalne organizacije u prostoru.
+
+Na kraju, korisno je razlikovati multispektralne i hiperspektralne podatke.
+Multispektralni sustavi bilježe manji broj unaprijed definiranih i međusobno odvojenih
+spektralnih kanala, što je često dovoljno za izračun najčešćih vegetacijskih indeksa i
+operativne primjene u poljoprivredi. Hiperspektralni sustavi, s druge strane, bilježe
+velik broj uskih i gotovo kontinuiranih spektralnih pojaseva, tako da je za svaki
+piksel moguće dobiti gotovo neprekinuti spektar reflektancije. Zbog veće spektralne
+razlučivosti hiperspektralni podaci omogućuju detaljnije razlikovanje materijala i
+precizniju procjenu biokemijskih i biofizičkih svojstava vegetacije, primjerice
+vodnoga stresa, sadržaja hranjiva ili razlika među vrstama. Međutim, takvi su podaci
+u pravilu zahtjevniji za pohranu, obradu i interpretaciju, pa su multispektralni
+sustavi i dalje češći izbor u operativnim primjenama snimanja poljoprivrednih površina
+iz drona.
+\section{Analiza oblaka točaka i 3D geometrije vegetacije}
+
+Oblak točaka predstavlja diskretnu trodimenzionalnu reprezentaciju stvarne scene,
+pri čemu svaka točka nosi prostorni položaj, a često i dodatne atribute poput
+intenziteta, klasifikacije, broja povrata ili vremena mjerenja. U odnosu na rasterske
+prikaze, oblak točaka zadržava izvornu geometrijsku granularnost mjerenja te je
+zbog toga posebno prikladan za analizu prostorne strukture vegetacije. U
+daljinskim istraživanjima i operativnim geoprostornim radnim tokovima 3D podaci
+koriste se za procjenu visine vegetacije, gustoće i vertikalne raspodjele krošnje,
+strukturne heterogenosti, volumena te drugih značajki važnih za agronomsku interpretaciju.
+
+Posebna prednost LiDAR podataka proizlazi iz činjenice da jedan laserski impuls može
+generirati više povrata. Time se ne registrira samo gornja ploha vegetacije, nego i
+njezina unutarnja vertikalna struktura, uključujući niže slojeve krošnje i, ovisno o
+gustoći sklopa, tlo ispod vegetacije. Upravo zato analiza oblaka točaka ne završava
+na izradi modela visine, nego često uključuje izdvajanje strukturnih metrika koje
+opisuju raspodjelu točaka po visini, gustoću zauzeća prostora, poroznost vegetacijskog
+sklopa i odnose između vegetacije i podloge. 
+
+U suvremenoj praksi izvorni oblaci točaka najčešće se razmjenjuju u formatu
+\texttt{LAS}, koji je industrijski standard za pohranu i razmjenu 3D
+točkastih podataka, dok \texttt{LAZ} predstavlja njegovu komprimiranu
+inačicu pogodnu za pohranu i distribuciju velikih skupova podataka. Iz takvih se izvornih zapisa često izvode i sekundarni proizvodi, primjerice digitalni modeli reljefa, modeli površine, intenzitetske slike i druge rasterske ili vektorske izvedenice.
+U novijim cloud-okruženjima sve su važniji i formati prilagođeni djelomičnom
+pristupu velikim skupovima podataka. Za rasterske proizvode to je najčešće COG 
+\engl{Cloud Optimized GeoTIFF}, dok se za oblake točaka sve češće koristi COPC
+\engl{Cloud Optimized Point Cloud}, koji organizira komprimirane LAZ
+podatke na način prikladan za prostorno selektivno čitanje bez potrebe za učitavanjem cijele datoteke.
+
+\section{Uloga koordinatnih sustava u geoprostornoj obradi}
+
+Pouzdana geoprostorna obrada pretpostavlja jednoznačno definiran koordinatni
+referentni sustav. Koordinatni sustav ne određuje samo projekciju karte, nego i
+geodetski datum, osi koordinata, mjerne jedinice te, po potrebi, vertikalnu
+referencu. Zbog toga prostorno usklađivanje skupova podataka nije samo tehničko
+pitanje prikaza, nego matematički definirana operacija koja izravno utječe na
+točnost preklapanja, mjerenja udaljenosti, procjene površina i volumena te
+interpretaciju prostornih odnosa među podacima.
+
+U praksi je osobito važno razlikovati konverzije i transformacije koordinata.
+Konverzija tipično označava promjenu prikaza unutar istoga referentnog okvira,
+primjerice prijelaz iz geografskih u ravninske koordinate, dok transformacija
+uključuje prijelaz između različitih datuma ili referentnih okvira. U radu s
+višesenzorskim geoprostornim podacima to je od posebne važnosti jer i vrlo male
+nedosljednosti u horizontalnom ili vertikalnom referentnom sustavu mogu dovesti do
+sustavnih prostornnih pogrešaka koje se kasnije pogrešno pripisuju senzoru,
+segmentaciji ili regresijskom modelu.
+
+Dodatnu složenost predstavlja činjenica da se u softverskim alatima i standardima ne susreće uvijek isti redoslijed osi. Suvremene biblioteke za koordinatne operacije
+poštuju autoritativni redoslijed osi definiran standardima i bazama referentnih
+sustava, dok dio GIS ekosustava i dalje koristi pojednostavljene ili povijesno
+uvriježene konvencije. Posljedica takvih razlika mogu biti zamijenjene osi,
+pogrešno interpretirane jedinice ili neusklađeni prostorni rezultati, osobito pri
+spajanju podataka iz različitih izvora i različitih formata.
+
+U kontekstu oblaka točaka dodatno je važno da prostorna referenca bude pravilno
+zapisana u samoj datoteci i dosljedno prenesena kroz cijeli obradni lanac. Kod
+formata \texttt{LAS/LAZ} suvremena praksa prednost daje OGC WKT zapisu
+koordinatnog sustava, dok stariji zapisi mogu sadržavati GeoTIFF ključeve ili
+nepotpune opise referentnog sustava. Stoga koordinatni sustav ne treba promatrati
+kao sporedni metapodatak, nego kao sastavni dio kvalitete geoprostornog podatka i
+preduvjet za svaku ozbiljnu višesenzorsku analizu.
+
+
+%--- METODOLOGIJA --------------------------------------------------------------
+\chapter{Metodologija}
+\label{pog:metodologija}
+\section{Skupovi podataka i način prikupljanja}
+
+U radu se koriste oblaci točaka prikupljeni bespilotnim letjelicama iznad vinograda.
+Podaci su spremljeni u LAS/LAZ formatu i obuhvaćaju multispektralne, infracrvene
+i LiDAR snimke. Dostupne su četiri multispektralne datoteke, koje predstavljaju
+četiri različita datuma snimanja, dvije infracrvene datoteke i jedna LiDAR datoteka.
+Multispektralne datoteke u prosjeku sadrže približno 50 milijuna točaka, zbog čega
+je obradu potrebno organizirati tako da se zadrži što više izvornih informacija, ali
+da se pojedini koraci mogu izvoditi nad izdvojenim dijelovima oblaka.
+
+Multispektralni podaci čine osnovu rada jer sadrže prostorne koordinate i spektralne
+kanale potrebne za izračun vegetacijskih indeksa, posebno crveni i bliski infracrveni
+kanal. Infracrveni i multispektralni podaci snimani su dronom sa sinkroniziranim
+sustavom, odnosno nastaju u istom vremenskom okviru. LiDAR podaci predstavljaju
+zasebno snimanje, pa se u ovom radu ne pretpostavlja potpuna prostorna usklađenost
+LiDAR i multispektralnih snimaka na razini pojedine točke. Zbog toga se ne provodi
+spajanje atributa različitih senzora tako da jedna točka istovremeno sadrži vrijednosti
+iz multispektralnog i LiDAR snimanja.
+
+U skladu s time, multispektralni oblak koristi se kao glavni izvor podataka za izračun
+NDVI-a, izdvajanje redova i računanje spektralnih statistika po redu. LiDAR se koristi
+ondje gdje je potrebna pouzdanija metrička interpretacija prostora, primjerice pri
+razmatranju visina, udaljenosti i geometrijskih odnosa. Infracrveni podaci služe kao
+dodatni izvor za provjeru prostornog obuhvata i usporedbu dostupnih atributa, ali
+nisu osnovni izvor za cjelokupni obradni lanac.
+
+Pregled osnovnih svojstava ulaznih podataka prikazan je u
+tablici~\ref{tab:ulazni_podaci}. Tablica sažima broj datoteka, tipične veličine skupova
+podataka, dostupne kanale i ulogu pojedinog tipa snimanja u radu.
+
+\begin{table}[htbp]
+\centering
+\caption{Pregled ulaznih skupova podataka korištenih u radu.}
+\label{tab:ulazni_podaci}
+\small  % Smanji font za bolji raspored
+\begin{tabular}{|l|c|c|p{3cm}|p{3.5cm}|}
+\hline
+\textbf{Tip podataka} & \textbf{Broj datoteka} & \textbf{Tipičan broj točaka} & \textbf{Dostupni kanali} & \textbf{Uloga u radu} \\
+\hline
+Multispektralni & 4 & $\sim$50 mil. po datoteci & RGB, NIR & NDVI, redovi, spektralne metrike \\
+\hline
+Infracrveni & 2 & $\sim$11 mil. po datoteci & RGB / IR atributi & Provjera obuhvata i atributa \\
+\hline
+LiDAR & 1 & -- & XYZ, intenzitet, povrati & Metrička i geometrijska provjera \\
+\hline
+\end{tabular}
+\end{table}
+
+\begin{table}[htbp]
+\centering
+\caption{Usporedba dostupnih atributa po tipu senzora. Oznaka \checkmark{} označava
+         prisutnost atributa, a -- njegovu odsutnost.}
+\label{tab:atributi_senzori}
+\small
+\begin{tabular}{|l|c|c|c|}
+\hline
+\textbf{Atribut / dimenzija}            & \textbf{MS (LAS 1.4)} & \textbf{IR (LAS 1.2)} & \textbf{LiDAR} \\
+\hline
+\multicolumn{4}{|l|}{\textit{Prostorne koordinate}} \\
+\hline
+$X, Y, Z$                               & \checkmark & \checkmark & \checkmark \\
+\hline
+\multicolumn{4}{|l|}{\textit{Spektralni kanali}} \\
+\hline
+Red (R)                                  & \checkmark & \checkmark & \checkmark \\
+\hline
+Green (G)                                & \checkmark & \checkmark & \checkmark \\
+\hline
+Blue (B)                                 & \checkmark & \checkmark & \checkmark \\
+\hline
+Near-infrared (NIR)                      & \checkmark & --         & --         \\
+\hline
+\multicolumn{4}{|l|}{\textit{LAS standardni atributi}} \\
+\hline
+\texttt{intensity}                       & \checkmark$^{a}$ & \checkmark$^{a}$ & \checkmark \\
+\hline
+\texttt{return\_number}                  & \checkmark & \checkmark & \checkmark \\
+\hline
+\texttt{number\_of\_returns}             & \checkmark & \checkmark & \checkmark \\
+\hline
+\texttt{classification}                  & \checkmark & \checkmark & \checkmark$^{b}$ \\
+\hline
+\texttt{scan\_direction\_flag}           & \checkmark & \checkmark & \checkmark$^{c}$ \\
+\hline
+\texttt{edge\_of\_flight\_line}          & \checkmark & \checkmark & \checkmark$^{c}$ \\
+\hline
+\texttt{point\_source\_id}               & \checkmark & \checkmark & \checkmark \\
+\hline
+\texttt{scan\_angle} / \texttt{scan\_angle\_rank} & \checkmark & \checkmark & \checkmark \\
+\hline
+\texttt{user\_data}                      & \checkmark & \checkmark & \checkmark \\
+\hline
+\texttt{synthetic}                       & \checkmark & \checkmark & \checkmark$^{c}$ \\
+\hline
+\texttt{key\_point}                      & \checkmark & \checkmark & \checkmark$^{c}$ \\
+\hline
+\texttt{withheld}                        & \checkmark & \checkmark & \checkmark$^{c}$ \\
+\hline
+\texttt{gps\_time}                       & \checkmark & --         & \checkmark \\
+\hline
+\multicolumn{4}{|l|}{\textit{Atributi specifični za LAS 1.4}} \\
+\hline
+\texttt{overlap}                         & \checkmark & --         & --         \\
+\hline
+\texttt{scanner\_channel}                & \checkmark & --         & --         \\
+\hline
+\multicolumn{4}{|l|}{\textit{Dodatni atributi}} \\
+\hline
+\texttt{confidence}                      & \checkmark & \checkmark & --         \\
+\hline
+Normalni vektori ($n_x, n_y, n_z$)      & \checkmark & \checkmark & --         \\
+\hline
+\multicolumn{4}{|l|}{\textit{Ukupno}} \\
+\hline
+Broj dimenzija                           & 26         & 22         & 19         \\
+\hline
+\end{tabular}
+ 
+\vspace{4pt}
+{\footnotesize
+$^{a}$~Atribut \texttt{intensity} prisutan je u MS i IR datotekama, ali ima
+konstantnu vrijednost~0 za sve točke te je stoga neinformativan. U LiDAR
+podatcima \texttt{intensity} sadrži stvarne vrijednosti (raspon 256--14\,592).\\
+$^{b}$~Svi LiDAR podatci klasificirani su istom klasom (\texttt{classification}~=~1),
+što znači da klasifikacija nije provedena.\\
+$^{c}$~Atribut je prisutan, ali ima konstantnu vrijednost~0 u cijelom skupu
+podataka.
+}
+\end{table}
+\section{Predobrada i provjera metapodataka}
+\label{sec:predobrada}
+ 
+Prije pokretanja glavnog obradnog cjevovoda provedena je sustavna analiza
+strukture i sadržaja svih ulaznih LAS/LAZ datoteka. Cilj ovog koraka je
+utvrđivanje koji se atributi mogu pouzdano koristiti u daljnjoj obradi te
+dokumentiranje ograničenja pojedinih skupova podataka.
+ 
+Za svaku datoteku analizirani su: LAS verzija i \emph{point format}, broj
+točaka, skale i pomaci koordinata, prostorni obuhvat, zapis koordinatnog
+referentnog sustava te popis dostupnih dimenzija. Dodatno su izrađene
+deskriptivne statistike po atributima --- za svaku dimenziju zabilježeni su tip
+podatka, broj jedinstvenih vrijednosti, raspon, srednja vrijednost, standardna
+devijacija i reprezentativni primjeri zapisa. Primjer takve analize za
+multispektralnu datoteku dan je u tablici~\ref{tab:ms_metapodaci}.
+ 
+% ---------- TABLICA: MS metapodaci ----------
+\begin{table}[htbp]
+\centering
+\caption{Metapodaci multispektralne datoteke 07-15-MS.laz.}
+\label{tab:ms_metapodaci}
+\small
+\begin{tabular}{|l|l|}
+\hline
+\textbf{Svojstvo}          & \textbf{Vrijednost} \\
+\hline
+Veličina datoteke           & 389{,}2\,MB \\
+\hline
+Broj točaka                 & 30\,362\,701 \\
+\hline
+LAS verzija / \emph{point format} & 1.4 / 8 \\
+\hline
+Broj dimenzija              & 26 \\
+\hline
+Skale ($s_x, s_y, s_z$)    & $10^{-8},\ 10^{-8},\ 10^{-3}$ \\
+\hline
+Pomaci ($o_x, o_y, o_z$)   & $13{,}61;\ 45{,}27;\ 30{,}00$ \\
+\hline
+$X$ raspon                  & $[13{,}6139\text{\textdegree}\ ;\ 13{,}6155\text{\textdegree}]$ \\
+\hline
+$Y$ raspon                  & $[45{,}2712\text{\textdegree}\ ;\ 45{,}2728\text{\textdegree}]$ \\
+\hline
+$Z$ raspon                  & $[35{,}73\,\text{m}\ ;\ 45{,}49\,\text{m}]$ \\
+\hline
+CRS                         & EPSG:4326 (WGS\,84) \\
+\hline
+\end{tabular}
+\end{table}
+ 
+Iz tablice~\ref{tab:ms_metapodaci} vidljivo je da multispektralna datoteka
+koristi \emph{point format}~8, koji je uveden u LAS~1.4 specifikaciji i
+omogućuje pohranu četiriju spektralnih kanala (R, G, B, NIR) u 16-bitnoj
+rezoluciji. Horizontalne koordinate zapisane su sa skalom od $10^{-8}$~stupnjeva,
+što pri geografskoj širini snimke ($\varphi \approx 45{,}27$\textdegree)
+odgovara rezoluciji od približno 0{,}7\,mm u smjeru istok--zapad i
+1{,}1\,mm u smjeru sjever--jug. Vertikalna koordinata pohranjena je s
+preciznošću od 1\,mm.
+ 
+Multispektralne i infracrvene datoteke koriste koordinatni sustav EPSG:4326
+(WGS\,84), u kojem su horizontalne koordinate izražene u stupnjevima geografske
+širine i duljine, a vertikalna koordinata u metrima iznad elipsoida. Takav
+sustav zadržava izvornu georeferenciranost snimaka, no ima bitnu posljedicu za
+prostornu analizu: udaljenosti izražene u stupnjevima nisu izotropne ---
+jedan stupanj geografske duljine na $45$\textdegree{} sjeverne širine
+predstavlja približno 78{,}8\,km, dok jedan stupanj geografske širine
+predstavlja približno 111{,}1\,km. Za izračun stvarnih metričkih udaljenosti
+između točaka stoga se mora primijeniti odgovarajuća projekcija ili korekcijski
+faktor $\cos\varphi$. LiDAR podatci, za razliku od multispektralnih i
+infracrvenih, koriste projicirani koordinatni sustav s koordinatama izraženima
+u metrima (raspon $X$: 273\,518--273\,524\,m; raspon $Y$:
+5\,018\,682--5\,018\,694\,m), što upućuje na UTM ili sličnu transverzalnu
+Mercatorovu projekciju. Zbog te razlike u koordinatnim sustavima, kao i
+činjenice da LiDAR potječe iz zasebnog snimanja, u radu se ne provodi spajanje
+atributa različitih senzora na razini pojedinačne točke. Umjesto toga, svaki se
+tip podataka koristi u skladu sa svojom ulogom: multispektralni podatci za
+spektralnu analizu i izdvajanje redova vinograda, a LiDAR za metričku
+interpretaciju visina, udaljenosti i geometrije vegetacije.
+ 
+Na temelju provedene analize utvrđeno je sljedeće:
+\begin{itemize}
+  \item Multispektralni podatci jedini sadrže NIR kanal i stoga su jedini
+        prikladni za izračun NDVI-a.
+  \item Atribut \texttt{intensity} u multispektralnim i infracrvenim
+        datotekama ima konstantnu vrijednost~0 za sve točke, dok u LiDAR
+        podatcima sadrži stvarne vrijednosti (raspon 256--14\,592).
+  \item MS i IR datoteke pokrivaju gotovo istovjetan prostorni obuhvat
+        (razlike manje od $0{,}001$\textdegree{} u obje horizontalne osi),
+        što potvrđuje da potječu iz istog leta.
+  \item LiDAR podatci nemaju provedenu klasifikaciju
+        (\texttt{classification}~=~1 za sve točke).
+\end{itemize}
+ 
+Rezultat predobrade je dokumentirani sažetak svojstava svih ulaznih datoteka
+koji služi kao osnova za odabir parametara daljnjih koraka. U obradnom
+cjevovodu zadržavaju se svi izvorni atributi --- koordinate, spektralni kanali,
+normalni vektori i informacije o CRS-u --- kako bi kasniji koraci mogli koristiti
+podatke bez nepotrebnog gubitka informacija.
+ 
+\section{Izdvajanje tla i biljne mase}
+\label{sec:izdvajanje_tla}
+ 
+Nakon provjere ulaznih podataka slijedi izdvajanje tla iz oblaka točaka. Ovaj
+je korak nužan jer točke tla dominiraju donjim dijelom scene i mogu otežati
+izdvajanje redova vinove loze. Cilj je klasificirati svaku točku kao tlo ili
+objekt iznad tla, pri čemu se druga skupina prosljeđuje u postupak izdvajanja
+redova.
+ 
+U radu su razmatrana dva pristupa. Jednostavniji se temelji na RANSAC
+segmentaciji ravnine, pri čemu se iterativno traži dominantna ploha u oblaku
+i odvajaju točke koje joj pripadaju. Takav pristup pretpostavlja da je cijeli
+teren opisan jednom ravninom, što ga čini neprikladnim za vinogradarske scene
+s lokalnim nagibima, terasama i neravnom strukturom terena --- dio terasa može
+biti pogrešno klasificiran kao vegetacija, a niska vegetacija na ravnim
+dijelovima uključena u tlo.
+ 
+Kao glavni pristup stoga je odabran SMRF (\emph{Simple Morphological Filter},
+Pingel et al., 2013), implementiran u PDAL biblioteci kroz filtar
+\texttt{filters.smrf}. SMRF se razlikuje od klasičnih morfoloških filtara
+(npr.\ Zhang et al., 2003) po tome što koristi progresivno povećanje
+strukturnog elementa i prag koji se prilagođava lokalnom nagibu terena. Postupak
+se odvija u sljedećim koracima:
+ 
+\begin{enumerate}
+  \item \textbf{Konstrukcija minimalne površine.} Oblak se rasterizira u
+        pravilnu 2D mrežu u kojoj svaka ćelija pohranjuje minimalnu $Z$
+        vrijednost svojih točaka. Prazne ćelije popunjavaju se interpolacijom
+        iz susjednih minimuma, čime nastaje gusta donja površina
+        $Z_{\min}(x, y)$.
+  \item \textbf{Progresivno morfološko otvaranje.} Na minimalnu površinu
+        primjenjuje se operacija otvaranja (erozija pa dilatacija) s
+        postupno rastućim polumjerom strukturnog elementa $w_i = 1, 2, \ldots$
+        ćelija, do zadane maksimalne veličine prozora. Svaka iteracija daje
+        sve glatkiju kandidatsku površinu tla $Z_{\mathrm{open},i}$.
+  \item \textbf{Detekcija objekata.} U svakoj iteraciji ćelija se označava
+        kao objekt (ne-tlo) ako razlika
+        $Z_{\min}(x,y) - Z_{\mathrm{open},i}(x,y)$ prelazi prag koji ovisi
+        o nagibu:
+        \begin{equation}
+          T_i = s \cdot w_i \cdot d + T_0,
+          \label{eq:smrf_threshold}
+        \end{equation}
+        gdje je $s$ očekivani nagib terena, $d$ veličina ćelije mreže, a
+        $T_0$ bazni visinski prag.
+  \item \textbf{Interpolacija i klasifikacija.} Ćelije koje ni u jednoj
+        iteraciji nisu označene kao objekt čine konačnu površinu tla. Rupe
+        nastale uklanjanjem objekata popunjavaju se interpolacijom. Svaka
+        ulazna točka klasificira se usporedbom s tom površinom: točke unutar
+        dopuštenog odstupanja dobivaju oznaku \texttt{Classification~=~2}
+        (ASPRS klasa ``tlo'').
+\end{enumerate}
+ 
+Prednost SMRF-a nad jednoplošnom RANSAC segmentacijom jest u tome što ne
+pretpostavlja globalnu planarnost terena. Progresivni prozor čuva terase i
+lokalne promjene reljefa, a parametri imaju fizikalnu interpretaciju (metri,
+postotak nagiba), što olakšava prilagodbu različitim letovima. Konačni odabir
+parametara proveden je eksperimentalno, usporedbom vizualnih rezultata i
+očuvanja strukture redova. Detalji implementacije i odabrani parametri opisani
+su u poglavlju o implementaciji.
+ 
+Rezultat ovog koraka su dvije izlazne cjeline: točke klasificirane kao tlo i
+točke iznad tla. Druga skupina sadrži krošnje vinove loze, stupove, žice i
+ostale objekte te predstavlja ulaz u postupak izdvajanja redova.
+ 
+ 
+\section{Izdvajanje redova vinograda}
+\label{sec:izdvajanje_redova}
+ 
+Nakon uklanjanja tla, preostale točke uglavnom pripadaju vegetaciji i pratećoj
+infrastrukturi vinograda. Kako bi se izračunale metrike po pojedinim redovima,
+oblak je potrebno podijeliti na cjeline koje odgovaraju redovima vinove loze.
+ 
+U radu se za to koristi euklidsko grupiranje (\emph{Euclidean cluster
+extraction}), implementirano u PCL biblioteci kroz razred
+\texttt{pcl::EuclideanClusterExtraction}. Riječ je o klasičnom algoritmu
+temeljenom na povezanim komponentama grafa, koji ne zahtijeva unaprijed poznat
+broj klastera --- svojstvo posebno pogodno za vinogradarske scene u kojima broj
+redova varira među snimkama. Postupak se izvodi u sljedećim koracima:
+ 
+\begin{enumerate}
+  \item Nad oblikom točaka iznad tla izgradi se $k$-d stablo za brzu
+        pretragu po udaljenosti.
+  \item Odabere se neposjećena početna točka i stavi u red čekanja.
+  \item Dok red nije prazan, za svaku izvađenu točku pretražuju se svi
+        susjedi unutar zadane tolerancije udaljenosti $d_{\mathrm{tol}}$.
+        Neposjećeni susjedi dodaju se u trenutni klaster i u red čekanja.
+  \item Kada se red isprazni, povezana komponenta je završena. Klaster se
+        zadržava samo ako mu je veličina unutar zadanih granica
+        $[n_{\min},\, n_{\max}]$; premali klasteri (šum, pojedinačni
+        stupovi) i preveliki (spojeni redovi) odbacuju se.
+  \item Postupak se ponavlja od koraka 2 dok sve točke nisu posjećene.
+\end{enumerate}
+ 
+Ključni parametar jest tolerancija udaljenosti $d_{\mathrm{tol}}$, koja
+određuje maksimalnu udaljenost dviju točaka da bi bile smatrane dijelom iste
+povezane komponente. U kontekstu vinograda, unutar reda krošnja je uglavnom
+neprekinuta s razmacima manjima od $d_{\mathrm{tol}}$, dok je međuredni
+prolaz znatno širi. Premala tolerancija uzrokuje prekomjernu segmentaciju
+(svaka biljka postaje zaseban klaster), a prevelika spaja susjedne redove u
+jedan klaster. Konačna vrijednost odabrana je eksperimentalno na temelju
+parametarskog pretraživanja nad više kombinacija tolerancije i veličine voksela,
+a detalji odabira opisani su u poglavlju o implementaciji.
+ 
+U ovom se koraku ne provodi prethodno smanjivanje gustoće oblaka
+(\emph{voxel downsampling}) kako bi se zadržalo izravno preslikavanje između
+geometrije i izvornih atributa svake točke. To je ključno jer se nakon
+izdvajanja redova za svaku točku koriste izvorne spektralne vrijednosti ---
+crveni i bliski infracrveni kanal --- za izračun NDVI-a. Svaki izdvojeni
+klaster pohranjuje se kao zasebna LAS datoteka uz očuvanje svih izvornih
+atributa, čime se omogućuje da geometrijska segmentacija i spektralna analiza
+djeluju nad istim skupom podataka bez gubitka informacija.
+ 
+
+\section{Odabir relevantnih točaka i izračun NDVI-a}
+
+Nakon što su redovi izdvojeni, za svaki se klaster računa NDVI. Budući da su u
+multispektralnim podacima dostupni crveni i bliski infracrveni kanal, NDVI se može
+izračunati izravno po svakoj točki koristeći izraz iz jednadžbe~\ref{eq:ndvi}. U
+implementaciji se naziv infracrvenog kanala može razlikovati između datoteka
+(\texttt{nir} ili \texttt{infrared}), pa je potrebno predvidjeti provjeru oba naziva.
+
+U metodološkom smislu razlikuju se dva pristupa odabiru relevantnih točaka.
+Prvi pristup oslanja se na NDVI kao spektralni kriterij. Točke s većim NDVI
+vrijednostima vjerojatnije pripadaju vegetaciji, dok niske vrijednosti mogu ukazivati
+na tlo, sjenu, drvo nosača ili šum. Drugi pristup oslanja se na geometrijske značajke,
+prvenstveno visinu iznad procijenjenog tla i položaj točke unutar strukture reda.
+Takav geometrijski pristup koristan je kada spektralne vrijednosti nisu stabilne ili
+kada je potrebno dodatno filtrirati rubna područja.
+
+U ovome radu ta se dva pristupa ne promatraju kao međusobno isključiva. Spektralni
+i geometrijski kriterij zajedno daju robusniju procjenu vegetacijski relevantnih točaka
+nego bilo koji od njih pojedinačno. Na taj se način smanjuje mogućnost da niska,
+ali zelena pozadinska vegetacija ostane uključena u red ili da stvarni dijelovi krošnje
+budu odbačeni samo zbog lokalnog spektralnog odstupanja.
+
+NDVI se u cjevovodu sprema kao dodatna dimenzija u izlaznim LAS datotekama
+pojedinih klastera. Takav zapis omogućuje da se vegetacijski indeks koristi i za
+kasnije računanje statistika i za vizualizaciju oblaka točaka. Uz per-point zapis NDVI-a,
+moguće je izraditi i dvodimenzionalne rastere u kojima se točke projiciraju na ravninu,
+agregiraju po ćelijama i prikazuju kao karta vegetacijskog indeksa. Time se zadržava
+detaljna analiza po točki, ali se dobiva i pregledniji prostorni prikaz cijelog vinograda
+ili pojedinog reda.
+
+\section{Računanje geometrijskih i strukturnih metrika}
+\label{sec:metrike}
+
+Za svaki izdvojeni red računaju se geometrijske, spektralne i strukturne metrike.
+Geometrijske metrike uključuju duljinu, širinu, orijentaciju, položaj te visinske
+pokazatelje reda. Duljina i širina dobivaju se projekcijom točaka na glavne osi reda,
+koje se procjenjuju analizom glavnih komponenata u ravnini $XY$. Visina reda računa
+se u odnosu na procijenjenu lokalnu podlogu, čime se dobivaju robusnije vrijednosti
+od jednostavne razlike između maksimalne i minimalne koordinate $Z$.
+
+Volumen biljne mase procjenjuje se u više koraka i s više pristupa. Prvi pristup
+temelji se na vokselizaciji, pri čemu se red dijeli na pravilne prostorne ćelije, a
+volumen se procjenjuje brojem zauzetih voksela pomnoženim volumenom pojedinačnog
+voksela. Drugi pristup koristi tehniku horizontalnih presjeka (\emph{slicing}):
+red se reže na $n$ slojeva po osi $Z$, a u svakom se sloju procjenjuje površina
+poprečnog presjeka pomoću $\alpha$-oblika (\emph{alpha shape}). Alpha shape je
+poopćenje konveksne ljuske koje konstruira konkavnu granicu oblaka točaka ---
+za zadani parametar $\alpha$ (odnosno maksimalni polumjer opisane kružnice
+trokuta) iz Delaunayeve triangulacije zadržavaju se samo trokuti čiji je
+opisani polumjer manji od $\alpha$, a rubni bridovi koji se pojavljuju točno
+jednom čine granični poligon čija se površina računa. Ukupni volumen dobiva se
+zbrajanjem umnožaka površine svakog sloja i njegove debljine:
+\begin{equation}
+  V = \sum_{k=1}^{n} A_{\alpha}(z_k) \cdot \Delta z,
+  \label{eq:vol_slice}
+\end{equation}
+gdje je $A_{\alpha}(z_k)$ površina alpha shape-a $k$-tog sloja. U usporedbi s
+vokselizacijom, ovaj je pristup osjetljiviji na konkavnosti i praznine u
+krošnji jer ne pretpostavlja da svaka zauzeta ćelija doprinosi punim volumenom
+kocke. Kao dopunski, eksperimentalni pristup koristi se i polinomni omotač, u
+kojem se za svaki presjek točke projiciraju na ravninu, razdijele u pojaseve
+po jednoj osi te se gornja i donja ovojnica aproksimiraju polinomom drugog ili
+trećeg stupnja. Površina presjeka tada se računa analitički kao integral razlike
+gornjeg i donjeg polinoma. Taj se pristup u radu promatra prije svega kao
+pomoćna usporedba i provjera rezultata dobivenih voksel i \emph{slicing}
+metodama.
+
+Uz volumen računaju se i strukturne metrike krošnje: poroznost, udio praznina
+(\emph{gap fraction}) te aproksimacije indeksa lisne površine i gustoće lisne
+površine. Poroznost $P$ definira se kao omjer praznih i ukupnih voksela unutar
+omeđujuće kutije promatranog dijela krošnje:
+\begin{equation}
+  P = 1 - \frac{n_{\mathrm{zauzeto}}}{n_{\mathrm{ukupno}}},
+  \label{eq:poroznost}
+\end{equation}
+gdje je $n_{\mathrm{zauzeto}}$ broj voksela koji sadrže barem jednu točku, a
+$n_{\mathrm{ukupno}}$ ukupan broj voksela u omeđujućoj kutiji. Udio praznina
+(\emph{gap fraction}) $G$ računa se analogno, ali na 2D projekciji poprečnog
+presjeka krošnje --- kao omjer praznih i ukupnih ćelija u ravnini okomitoj na
+smjer reda.
+
+\emph{Leaf Area Index} (LAI) jest bezdimenzionalni omjer ukupne jednostrane
+površine listova i površine tla koju krošnja pokriva. Budući da se u ovom radu
+ne provodi izravno mjerenje lisne površine, LAI se aproksimira inverzijom
+Beer--Lambertovog zakona propuštanja svjetlosti kroz krošnju:
+\begin{equation}
+  \mathrm{LAI} = -\frac{\ln\!\big(\max(G,\,\varepsilon)\big)}{G_{\ell}},
+  \label{eq:lai}
+\end{equation}
+gdje je $G$ izmjereni udio praznina, $\varepsilon$ mala konstanta koja
+sprječava logaritmiranje nule, a $G_{\ell} = 0{,}5$ koeficijent koji
+pretpostavlja sferičnu raspodjelu orijentacije listova. \emph{Leaf Area
+Density} (LAD) predstavlja vertikalnu raspodjelu lisne površine po jedinici
+visine i računa se primjenom istog izraza na svaki horizontalni sloj
+zasebno:
+\begin{equation}
+  \mathrm{LAD}(z_k) = -\frac{\ln\!\big(\max(G(z_k),\,\varepsilon)\big)}{G_{\ell} \cdot \Delta z},
+  \label{eq:lad}
+\end{equation}
+gdje je $G(z_k)$ udio praznina u sloju $z_k$, a $\Delta z$ debljina sloja.
+Srednji LAD po redu dobiva se usrednjavanjem vrijednosti svih slojeva koji
+sadrže dovoljno točaka za pouzdanu procjenu. Budući da je red vinove loze dug
+i uzak objekt, strukturne metrike računaju se lokalno po kraćim segmentima
+duž reda, a ne na cijelom redu odjednom; detalji segmentacije opisani su u
+poglavlju o implementaciji.
+
+Rezultati svih navedenih postupaka se spremaju u tabličnom obliku u kojem svaki zapis odgovara
+jednom redu vinograda ili jednom segmentu reda. Takav oblik omogućuje
+sustavnu usporedbu redova, analizu korelacija između NDVI-a, volumena i
+strukturnih metrika te integraciju s prostornim prikazima.
+
+\newpage
+\section{Konceptualni cjevovod}
+Opisani koraci - provjera metapodataka, uklanjanje tla, izdvajanje redova,
+izračun NDVI-a te računanje geometrijskih i strukturnih metrika - čine
+cjelovit obradni cjevovod u kojem svaka faza proizvodi samostalne
+međurezultate na disku. Time je omogućeno djelomično ponavljanje obrade:
+primjerice, ako se mijenja samo logika računanja metrika, faze uklanjanja tla
+i grupiranja ne moraju se ponovno izvršavati. Takva modularnost olakšava
+iterativni razvoj i prilagodbu velikim skupovima podataka te otvara mogućnost
+raspodijeljenog izvođenja pojedinih faza u oblaku.
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.8\textwidth]{images/cjevovod3.png}
+  \caption{Shematski prikaz obradnog cjevovoda od sirovog oblaka točaka
+           do tablice metrika po redu vinograda.}
+  \label{fig:cjevovod}
+\end{figure}
+
+
+
+
+
+\chapter{Implementacija}
+\label{ch:implementacija}
+
+U ovom poglavlju opisana je cjelokupna programska realizacija sustava za izračun
+strukturnih i spektralnih obilježja vinove loze iz multispektralnog oblaka točaka
+prikupljenog dronom. Implementacija je projektirana kao slijedna obradbena
+cjevovod-arhitektura (\emph{pipeline}), pri čemu se svaka obradbena faza može
+izvršavati samostalno radi otklanjanja pogrešaka i ponovne uporabe međurezultata.
+Cilj poglavlja nije samo opisati \emph{što} sustav radi, nego i \emph{zašto} su
+pojedina rješenja odabrana, koje su prepreke uočene tijekom razvoja i kako su one
+otklonjene.
+
+% =============================================================================
+\section{Programsko okruženje i organizacija repozitorija}
+\label{sec:okruzenje}
+
+Sustav je razvijen u kombinaciji jezika \emph{Python} i \emph{C++}. Python
+služi za I/O nad \texttt{LAS}/\texttt{LAZ} datotekama, orkestraciju koraka i
+izračun značajki, dok se C++ koristi isključivo za euklidsko grupiranje oblaka
+reda veličine $10^7$ točaka putem biblioteke \emph{PCL}.
+
+Ključnu ulogu ima \emph{PDAL}, koji se koristi u tri dijela cjevovoda:
+morfološka klasifikacija tla (\texttt{filters.smrf}), pretvorba formata pri
+ulasku u C++ klasteriranje (\texttt{pdal translate}) te spajanje segmentiranih
+klastera u jedinstvenu izlaznu datoteku (\texttt{pdal merge}). PDAL se poziva
+putem Python vezanja ili naredbenog retka, ovisno o radnom okruženju. Od
+ostalih biblioteka koriste se \texttt{laspy} i \texttt{pypcd4} za rad s
+datotekama oblaka točaka, \texttt{scipy} i \texttt{shapely} za Delaunayevu
+triangulaciju i konstrukciju alpha shape poligona, \texttt{open3d} za
+vizualizaciju te \texttt{numpy}, \texttt{pandas} i \texttt{pyarrow} za
+numeričke izračune i zapisivanje izlaza u format \emph{Apache Parquet}.
+
+Repozitorij slijedi obrazac \emph{arhitekture medaljona} \engl{medallion
+architecture}: nepromijenjeni ulazni podatci čuvaju se u sloju
+\texttt{bronze/}, međuobrade u \texttt{silver/}, a konačne tablice obilježja u
+\texttt{gold/}. Izlazi su particionirani po identifikatoru pokretanja
+(\texttt{run\_id}) i fazi obrade (\texttt{stage}), čime je omogućeno paralelno
+izvođenje više konfiguracija i jednoznačno povezivanje izlaza s parametrima
+koji su ih proizveli.
+
+% =============================================================================
+\section{Ulazni podaci i organizacija obradbenog toka}
+\label{sec:tok}
+
+Primarni ulazni podatak jest multispektralni oblak točaka
+\texttt{2025-07-15-MS\_Vinograd\_1.las} prikupljen multispektralnim senzorom
+montiranim na bespilotnu letjelicu iznad vinograda. Datoteka u zaglavlju nosi
+spektralne kanale \emph{Red} i \emph{Infrared} kao \texttt{Unsigned16}
+atribute po točki, što omogućuje izračun NDVI-ja izravno iz oblaka točaka, bez
+potrebe za rasterizacijom u GeoTIFF.
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=\textwidth]{images/vineyard.png}
+  \caption{Prikaz ulaznog multispektralnog oblaka točaka vinograda u
+           programu CloudCompare. Vidljiva je pravilna struktura redova
+           vinove loze i okolna vegetacija.}
+  \label{fig:vineyard}
+\end{figure}
+
+Globalni tok obrade može se sažeti slijedećom relacijom (svaka strelica
+predstavlja zaseban skriptni korak):
+
+\begin{equation}
+\label{eq:pipeline}
+\texttt{LAS}_{\text{sirovi}}
+\;\rightarrow\; \texttt{LAS}_{\text{ne-tlo}}
+\;\rightarrow\; \texttt{PCD}_{\text{redovi}}
+\;\rightarrow\; \texttt{LAS}_{\text{NDVI po redu}}
+\;\rightarrow\; \text{Parquet}_{\text{obilježja}}.
+\end{equation}
+
+Razdvajanje obradbenog toka u diskretne korake bilo je izrazito važno: rana
+verzija sustava bila je monolitna i svako odstupanje u jednom koraku zahtijevalo
+je ponovno pokretanje cjelokupne obrade, što je za ulazni oblak od približno
+$1{,}2 \cdot 10^7$ točaka iziskivalo nekoliko desetaka minuta. Razlomljenom
+arhitekturom svaki korak proizvodi datotečni artefakt na disku
+(\texttt{out\_ground/}, \texttt{out\_cluster/}, \texttt{out\_cluster\_las/}),
+što omogućuje trenutni nastavak obrade s mjesta promjene.
+
+% =============================================================================
+\section{Uklanjanje tla SMRF postupkom}
+\label{sec:smrf_impl}
+
+Algoritamska osnova SMRF postupka i usporedba s RANSAC pristupom opisani su u
+odjeljku~\ref{sec:izdvajanje_tla}. U ovom se odjeljku opisuju konkretni
+parametri, eksperimentalni odabir njihovih vrijednosti te implementacijski
+detalji produkcijske skripte.
+
+\begin{figure}[htbp]
+  \centering
+  \begin{minipage}[t]{0.48\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{images/ground_removed.png}
+  \end{minipage}
+  \hfill
+  \begin{minipage}[t]{0.48\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{images/ransac_failure.png}
+  \end{minipage}
+  \caption{Neuspješno uklanjanje tla RANSAC postupkom. Lijevo: prikazane su
+           samo ne-tlo točke --- vidljivo je da značajan dio tla nije uklonjen
+           i ostaje među vegetacijom. Desno: prikaz iz drugog kuta s
+           razdvojenim bojama tla (sivo) i ne-tla (zeleno), koji pokazuje da
+           jedna ravnina ne može pratiti terasaste promjene reljefa.}
+  \label{fig:ransac_failure}
+\end{figure}
+
+\paragraph{Odabir parametara.}
+SMRF ima četiri hiperparametra čije su vrijednosti fizikalno interpretirane, što
+olakšava prilagodbu novim letovima. U tablici~\ref{tab:smrf_params} prikazan je
+opis svakog parametra, početna preporučena vrijednost iz dokumentacije PDAL-a
+te konačna odabrana vrijednost za ovaj rad.
+
+\begin{table}[htbp]
+\centering
+\caption{Hiperparametri SMRF postupka: značenje, početne i konačne vrijednosti.}
+\label{tab:smrf_params}
+\small
+\begin{tabular}{|l|p{5.5cm}|c|c|}
+\hline
+\textbf{Parametar} & \textbf{Značenje} & \textbf{Početna} & \textbf{Konačna} \\
+\hline
+\textit{slope}     & Očekivani maksimalni nagib terena
+                     (\%). Veći nagib dopušta veću
+                     visinsku razliku prije nego što se
+                     ćelija proglasi objektom.
+                   & $0{,}20$ & $0{,}15$ \\
+\hline
+\textit{window}    & Maksimalni polumjer strukturnog
+                     elementa (m). Određuje do koje
+                     veličine objekti mogu biti
+                     prepoznati --- veći prozor hvata
+                     veće objekte, ali može zagladiti
+                     oštre rubove terena.
+                   & $18{,}0$ & $16{,}0$ \\
+\hline
+\textit{threshold} & Bazni visinski prag (m) pri nultom
+                     nagibu. Točke bliže tlu od ovog
+                     praga ostaju klasificirane kao tlo
+                     čak i u prvoj iteraciji.
+                   & $0{,}50$ & $0{,}50$ \\
+\hline
+\textit{scalar}    & Množitelj na nagibni dio praga
+                     $T_i$ iz jednadžbe~\eqref{eq:smrf_threshold}.
+                     Vrijednost veća od $1$ popušta
+                     filtar na strmijim dijelovima,
+                     čime se terasasti prijelazi ne
+                     uklanjaju kao vegetacija.
+                   & $1{,}25$ & $1{,}25$ \\
+\hline
+\end{tabular}
+\end{table}
+
+Početne preporučene vrijednosti (\textit{slope}~$= 0{,}20$,
+\textit{window}~$= 18$~m) pri gustim trsovima rezultirale su uklanjanjem
+dijela niskih grana kao da pripadaju tlu --- filtar je bio previše agresivan
+jer je veći prozor zagladio fine visinskih razlike, a veći nagib dopustio da se
+niske grane interpretiraju kao dio podloge. Smanjenje nagiba na $0{,}15$ i
+prozora na $16$~m omogućilo je očuvanje niskog rasta dok se travnata podloga
+između redova i dalje uspješno uklanjala. Parametri \textit{threshold} i
+\textit{scalar} zadržani su na preporučenim vrijednostima jer nisu pokazali
+značajan utjecaj na rezultat u promatranom rasponu. Na
+slici~\ref{fig:smrf_comparison} prikazana je usporedba rezultata dvaju skupova
+parametara na istom dijelu vinograda.
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=\textwidth]{images/smrf_comparison.png}
+  \caption{Usporedba SMRF rezultata. Lijevo: početni parametri
+           (\textit{slope}~$= 0{,}20$, \textit{window}~$= 18$~m) ---
+           vidljivo je da niske grane nedostaju jer su klasificirane kao
+           tlo. Desno: prilagođeni parametri
+           (\textit{slope}~$= 0{,}15$, \textit{window}~$= 16$~m) ---
+           niske grane su očuvane, podloga je i dalje uklonjena.}
+  \label{fig:smrf_comparison}
+\end{figure}
+
+\paragraph{Implementacija.}
+Skripta \texttt{smrf\_ground\_classification.py} izgrađuje JSON cjevovod oblika
+$\texttt{readers.las} \rightarrow \texttt{filters.smrf} \rightarrow
+\texttt{writers.las}$ i izvršava ga putem Python vezivanja PDAL-a, uz
+\emph{fallback} na naredbeni redak (\texttt{pdal pipeline}) ako vezivanja nisu
+dostupna na radnom okruženju. Nakon klasifikacije, funkcija
+\texttt{split\_ground\_non\_ground} čita klasificiranu datoteku pomoću
+\texttt{laspy} biblioteke, razdvaja točke maskom \texttt{Classification == 2}
+i zapisuje dvije zasebne datoteke: \texttt{*\_ground.las} i
+\texttt{*\_non\_ground.las}. Na promatranom podatkovnom skupu tipičan udio
+uklonjenih točaka tla iznosi između 35\,\% i 45\,\% ulaznog broja točaka,
+ovisno o gustoći trsja i konfiguraciji leta.
+
+% =============================================================================
+\section{Euklidsko grupiranje redova}
+\label{sec:clustering}
+
+Algoritamska osnova euklidskog grupiranja i obrazloženje odabira metode opisani
+su u odjeljku~\ref{sec:izdvajanje_redova}. Ovaj odjeljak opisuje pretvorbu
+formata, konkretne parametre, prepreke uočene tijekom razvoja i postupak
+eksperimentalnog odabira konačnih vrijednosti. Pretraga susjeda unutar zadane tolerancije izvodi se nad
+\emph{$k$-d stablom} --- binarnom prostornom strukturom koja rekurzivno
+dijeli prostor naizmjeničnim rezovima po koordinatnim osima, čime svaki
+čvor stabla predstavlja hiperravninu koja dijeli preostale točke na dvije
+polovice. Zahvaljujući toj strukturi, pretraga susjeda u gustom oblaku od
+$10^7$ točaka ima složenost $\mathcal{O}(\log n)$ umjesto linearne
+$\mathcal{O}(n)$, što je ključno za izvedivost grupiranja u razumnom
+vremenu.
+
+\paragraph{Pretvorba formata.}
+Implementacija se nalazi u \texttt{clustering\_only.cpp} i očekuje ulaz u
+binarnom PCD formatu. Ulazne \texttt{LAS}/\texttt{LAZ} datoteke stoga se
+najprije konvertiraju pozivom
+\texttt{pdal translate} uz eksplicitno zadržavanje polja \texttt{Red} i
+\texttt{Infrared} (\texttt{keep\_unspecified=true}). Bez tog parametra
+dodatne dimenzije se gube --- problem koji je u ranoj inačici prouzročio prazne
+NDVI vrijednosti u izlaznim datotekama i identificiran je tek nakon detaljne
+provjere izlaznih dimenzija u \texttt{laspy}.
+
+\paragraph{Parametri grupiranja.}
+Algoritam je konfiguriran s tri parametra:
+\begin{equation}
+\label{eq:cluster_params}
+d_{\mathrm{tol}} = 0{,}4 \; \text{m}, \quad
+N_{\min} = 50\,000, \quad
+N_{\max} = 850\,000.
+\end{equation}
+Donja granica $N_{\min}$ namjerno je postavljena visoko jer redovi vinograda
+sadrže izrazito velik broj točaka, dok manji grozdovi predstavljaju artefakte
+šuma ili pojedinačno grmlje izvan parcele. Gornja granica $N_{\max}$ sprječava
+da cijeli vinograd bude vraćen kao jedan grozd u slučaju kad tolerancija ne
+razdvoji susjedne redove.
+
+\paragraph{Eksperimentalni odabir tolerancije.}
+Vrijednost $d_{\mathrm{tol}} = 0{,}4$~m odabrana je nakon parametarskog
+pretraživanja nad četiri konfiguracije ($d_{\mathrm{tol}} \in \{0{,}15,\;
+0{,}21,\; 0{,}30,\; 0{,}40\}$~m). Rezultati su praćeni putem CSV dnevnika
+\texttt{clustering\_only\_log.csv} koji za svako pokretanje bilježi
+identifikator konfiguracije, toleranciju, broj ulaznih točaka, broj dobivenih
+klastera i oznaku valjanosti. Pokretanje se smatra valjanim ako proizvede
+najviše 50 klastera.
+
+Pri manjim tolerancijama ($0{,}15$--$0{,}21$~m) male praznine u krošnji
+prekidale su povezanost unutar reda, što je dovodilo do fragmentacije
+jednog reda u više klastera. Pri vrijednosti $0{,}40$~m razmak između
+susjednih redova (tipično $> 1$~m) ostaje dovoljno velik da se redovi
+ne spajaju, dok se praznine unutar krošnje premošćuju.
+
+Na slikama~\ref{fig:clustering_bad} i~\ref{fig:clustering_result} prikazana je
+usporedba rezultata grupiranja pri različitim konfiguracijama parametara te
+konačni odabrani rezultat.
+
+\begin{figure}[htbp]
+  \centering
+
+  \begin{minipage}[t]{0.48\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{images/custom_clus1.png}
+  \end{minipage}
+  \hfill
+  \begin{minipage}[t]{0.48\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{images/custom_clus2.png}
+  \end{minipage}
+
+  \vspace{0.4cm}
+
+  \begin{minipage}[t]{0.48\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{images/custom_clus3.png}
+  \end{minipage}
+
+  \caption{Rezultati grupiranja pri različitim konfiguracijama parametara.
+           Gore lijevo: \texttt{tol}~$= 0{,}8$~m, \texttt{leaf}~$= 0{,}22$~m,
+           \texttt{dist}~$= 0{,}10$~m --- više redova spojeno u isti klaster,
+           pojedine točke nepridružene.
+           Gore desno: \texttt{tol}~$= 1{,}1$~m, \texttt{leaf}~$= 0{,}20$~m,
+           \texttt{dist}~$= 0{,}10$~m --- gotovo polovica redova ima istu
+           klasu.
+           Dolje: \texttt{tol}~$= 0{,}9$~m, \texttt{leaf}~$= 0{,}25$~m,
+           \texttt{dist}~$= 0{,}02$~m --- znatno bolji rezultat, ali još
+           uvijek nedovoljno čista separacija redova.}
+  \label{fig:clustering_bad}
+\end{figure}
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=\textwidth]{images/clustering.png}
+  \caption{Konačni rezultat euklidskog grupiranja s produkcijskim parametrima
+           iz~\eqref{eq:cluster_params} ($d_{\mathrm{tol}} = 0{,}4$~m,
+           $N_{\min} = 50\,000$, $N_{\max} = 850\,000$, bez vokselizacije):
+           svaki izdvojeni red vinove loze prikazan je zasebnom bojom.}
+  \label{fig:clustering_result}
+\end{figure}
+
+\paragraph{Očuvanje atributa.}
+Ekstrakcija pojedinog klastera izvedena je razredom
+\texttt{pcl::ExtractIndices<pcl::PCLPointCloud2>} koji radi nad cjelovitim
+oblakom sa svim dimenzijama, čime se spektralni kanali prenose u izlazne PCD
+datoteke bez gubitka. Parametar \texttt{leaf} (veličina vokselizacijskog
+filtra) postavljen je na nulu --- u ranijim verzijama vokselizacija s
+\texttt{leaf~>~0} prekidala je 1:1 korespondenciju između XYZ podskupa
+korištenog za $k$-d stablo i punog zapisa s atributima, što je rezultiralo
+pogrešnim spektralnim kanalima u izlazu. To ograničenje eksplicitno je
+dokumentirano u kodu, a konfiguracije s \texttt{leaf~>~0} odbacuju se uz
+poruku upozorenja.
+
+% =============================================================================
+\section{Izračun NDVI-ja i priprema izlaznih LAS datoteka}
+\label{sec:ndvi}
+
+Svaki grozd dobiven u prethodnom koraku zapisan je kao zasebna \texttt{PCD}
+datoteka koja sadrži, uz koordinate \texttt{X}, \texttt{Y}, \texttt{Z}, i
+spektralne kanale \texttt{red} i \texttt{infrared}. Skripta
+\texttt{pcd\_to\_ndvi\_las.py} pretvara svaki takav grozd u
+\texttt{LAS}~1.4 datoteku obogaćenu dodatnom dimenzijom NDVI.
+
+NDVI je izračunat prema standardnoj definiciji:
+
+\begin{equation}
+\label{eq:ndvi}
+\mathrm{NDVI} \;=\; \frac{\mathrm{NIR} - \mathrm{Red}}{\mathrm{NIR} + \mathrm{Red} + \varepsilon},
+\end{equation}
+
+gdje je $\varepsilon = 10^{-6}$ uvedeno radi numeričke stabilnosti pri točkama
+gdje su oba kanala bliska nuli. Vrijednost NDVI-ja teorijski leži u intervalu
+$[-1, 1]$, no za vegetacijske točke u praksi pripada intervalu $[0{,}1; 0{,}9]$.
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=\textwidth]{images/ndvi_cc.png}
+  \caption{Prikaz segmentiranih redova vinograda obojanih prema izračunatoj
+           NDVI vrijednosti u programu CloudCompare. Toplije boje označavaju
+           viši NDVI (gušća vegetacija), a hladnije niži NDVI.}
+  \label{fig:ndvi_cc}
+\end{figure}
+
+Funkcija \texttt{export\_filtered\_las} prilikom zapisa izlazne datoteke koristi
+\emph{template} \texttt{LAS} iz prethodnog koraka kao izvor zaglavlja,
+prostornog referentnog sustava (\texttt{WKT}) i skala/odmaka. To je odabrano
+nakon što je rana inačica generirala koordinate s pogrešnim odmakom jer je
+laspy podrazumijevano koristio nove skale. Konkretno, koristi se obrazac
+
+\begin{equation}
+\label{eq:laspy_template}
+\texttt{hdr} \;=\; \texttt{las\_template.header.copy()}, \quad
+\texttt{hdr.point\_count} = n,
+\end{equation}
+
+uz alokaciju \texttt{laspy.ScaleAwarePointRecord.zeros(n, header=hdr)}. NDVI se
+zatim zapisuje kao \emph{extra dimension} tipa \texttt{float32}, dok se kanali
+\texttt{red} i \texttt{infrared} čuvaju kao \texttt{uint16} (sa \texttt{clip}-om
+na raspon $[0, 65\,535]$). Ako template već definira polje \texttt{nir}
+unutar standardnog \texttt{LAS}~1.4 oblika, vrijednosti iz \texttt{infrared}
+preusmjeravaju se na to polje.
+
+Završni korak ovog dijela cjevovoda jest objedinjavanje svih NDVI grozdova u
+jednu datoteku za vizualizaciju. Skripta \texttt{merge\_las\_points.py} izvodi
+\emph{streaming} spajanje pomoću \texttt{laspy.chunk\_iterator} (po
+$10^6$ točaka po bloku), uz opcijsku deduplikaciju temeljenu na cjelobrojnim
+prostornim ključevima:
+
+\begin{equation}
+\label{eq:hash}
+h(X, Y, Z) \;=\; (X \cdot 73\,856\,093) \;\oplus\; (Y \cdot 19\,349\,663) \;\oplus\; (Z \cdot 83\,492\,791),
+\end{equation}
+
+što izbjegava potrebu da se cijeli oblak zadrži u memoriji.
+
+% =============================================================================
+\section{Izračun obilježja po redu}
+\label{sec:row_features}
+
+Najveći analitički sloj sustava implementiran je u skripti
+\texttt{compute\_row\_features.py}. Za svaku grozd-\texttt{LAS} datoteku
+generiranu u koraku iz~\ref{sec:ndvi}, ova skripta izračunava niz geometrijskih
+i spektralnih obilježja te ih pohranjuje u jedinstvenu \emph{Parquet} tablicu
+\texttt{row\_features.parquet}.
+
+Implementacija je modularno podijeljena na šest neovisnih cjelina koje su u
+nastavku opisane u zasebnim potpoglavljima.
+
+% -----------------------------------------------------------------------------
+\subsection{Procjena visine}
+\label{ssec:visina}
+
+Naivni pristup procjeni visine reda --- razlika između $z_{\max}$ i $z_{\min}$
+oblaka --- pokazao se nepouzdanim na nagnutim parcelama jer mješa stvarnu visinu
+biljke s topografskim nagibom. Iz tog razloga implementirana je procjena visine
+koja je svjesna nagiba (\emph{slope-aware}).
+
+Funkcija \texttt{\_ransac\_ground\_plane} prilagođava ravninu lokalnog tla samo
+nad $10\%$ najnižih točaka grozda, koristeći RANSAC s $200$ iteracija i pragom
+inlier-a od $0{,}10$~m. Iz tri slučajno odabrane točke računa se normala
+$\mathbf{n}$ ravnine, pri čemu se odbacuju kandidati s $n_z < 0{,}707$
+($\approx 45^\circ$) jer ne mogu predstavljati tlo.
+
+Visina svake točke iznad lokalne ravnine zatim glasi:
+
+\begin{equation}
+\label{eq:height_signed}
+h_i \;=\; \mathbf{n}^\top \mathbf{p}_i + d,
+\end{equation}
+
+gdje je $d = -\mathbf{n}^\top \mathbf{p}_0$ pomak ravnine. Da bi se kompenzirao
+preostali šum, vrijednosti $h_i$ pomaknute su tako da $2$. percentil bude jednak
+nuli:
+
+\begin{equation}
+\label{eq:height_shift}
+h_i \;\leftarrow\; h_i \;-\; \mathrm{Q}_{0{,}02}(h).
+\end{equation}
+
+Iz vektora $\{h_i\}$ izračunavaju se obilježja \texttt{height\_max},
+\texttt{height\_mean}, \texttt{height\_p50}, \texttt{height\_p90},
+\texttt{height\_std} i koeficijent varijacije
+$\mathrm{CV} = \sigma_h / \bar{h}$. Dodatno se zapisuje i procijenjeni nagib tla
+$\theta = \arccos(|n_z|)$ u stupnjevima.
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.8\textwidth]{images/lidar_z.png}
+  \caption{Distribucija visina ($Z$) u LiDAR oblaku točaka. Histogram
+           omogućuje procjenu visinskog raspona vegetacije i identifikaciju
+           razine tla.}
+  \label{fig:lidar_z}
+\end{figure}
+
+% -----------------------------------------------------------------------------
+\subsection{Geometrija reda}
+\label{ssec:geometrija}
+
+Za svaki izdvojeni klaster potrebno je odrediti duljinu, širinu i orijentaciju
+reda vinove loze. Naivni pristup --- mjerenje raspona koordinata po osima
+sjever--jug i istok--zapad --- daje pogrešne rezultate čim red nije poravnat s
+koordinatnim osima. Primjerice, red koji se pruža dijagonalno pod kutom od
+$45$\textdegree{} imat će gotovo jednake raspone po obje osi, pa bi izmjerena
+``duljina'' i ``širina'' bile međusobno slične, unatoč tome što je red u
+stvarnosti mnogo duži nego širi.
+
+Problem se rješava analizom glavnih komponenata (\emph{PCA}) nad $XY$
+projekcijom oblaka, koja pronalazi \emph{prirodni} koordinatni sustav reda ---
+os maksimalne raspršenosti točaka i os okomitu na nju. Postupak se odvija u
+tri koraka. Najprije se za sve točke klastera uzimaju samo horizontalne
+koordinate $(x_i, y_i)$ i centriraju oduzimanjem srednje vrijednosti. Zatim
+se računa kovarijancijska matrica centriranih koordinata:
+\begin{equation}
+\label{eq:cov}
+\mathbf{C} \;=\; \frac{1}{N - 1} \sum_{i=1}^{N}
+  (\mathbf{x}_i - \bar{\mathbf{x}})
+  (\mathbf{x}_i - \bar{\mathbf{x}})^\top,
+\end{equation}
+koja je simetrična matrica dimenzija $2 \times 2$ i opisuje koliko se točke
+raspršuju u pojedinom smjeru. Iz nje se izvlače dva svojstvena vektora:
+$\mathbf{u}$ (pridružen većoj vlastitoj vrijednosti $\lambda_1$) i
+$\mathbf{v} = (-u_y, u_x)$ (pridružen manjoj $\lambda_2$). Vektor
+$\mathbf{u}$ pokazuje smjer u kojem su točke najviše raspršene, što za
+izduženi red vinove loze odgovara smjeru pružanja reda. Vektor $\mathbf{v}$
+okomit je na njega i predstavlja poprečni smjer.
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=\textwidth]{images/pca_before_after.png}
+  \caption{Prikaz PCA rotacije reda vinove loze. Lijevo: izvorne koordinate
+           u kojima red leži dijagonalno. Desno: nakon rotacije u lokalni
+           koordinatni sustav $(u, v)$ red je poravnat s koordinatnim osima,
+           čime su duljina $L$ i širina $W$ ispravno mjerljive.}
+  \label{fig:pca_before_after}
+\end{figure}
+
+Duljina i širina reda tada se računaju kao rasponi projekcija svih točaka na
+te dvije osi:
+\begin{equation}
+\label{eq:row_dims}
+L \;=\; \max_i (\mathbf{u}^\top \mathbf{x}_i)
+  \;-\; \min_i (\mathbf{u}^\top \mathbf{x}_i), \quad
+W \;=\; \max_i (\mathbf{v}^\top \mathbf{x}_i)
+  \;-\; \min_i (\mathbf{v}^\top \mathbf{x}_i).
+\end{equation}
+Projekcija $\mathbf{u}^\top \mathbf{x}_i$ daje udaljenost točke $i$ duž
+smjera reda --- razlika krajnjih projekcija jest duljina $L$. Analogno,
+projekcija na $\mathbf{v}$ daje poprečni položaj, a raspon tih projekcija
+jest širina $W$. Budući da su osi prilagođene stvarnom smjeru reda, a ne
+fiksnom koordinatnom sustavu, vrijednosti $L$ i $W$ ispravno opisuju
+geometriju i kod dijagonalno položenih redova.
+
+Orijentacija reda izražava se azimutom --- kutom glavne osi u odnosu na
+sjever, mjerenim u smjeru kazaljke na satu:
+\begin{equation}
+\label{eq:azimuth}
+\alpha \;=\; \mathrm{atan2}(u_x, u_y) \pmod{360^\circ}.
+\end{equation}
+
+Iz navedenih vrijednosti dodatno se izvodi gustoća točaka po metru reda
+($N / L$), koja služi kao indikator kvalitete oblaka --- nagli pad gustoće
+na jednom dijelu reda može ukazivati na prazninu u snimci ili na problem pri
+grupiranju. Rezultati se zapisuju u izlaznu tablicu kao obilježja
+\texttt{row\_length}, \texttt{row\_width}, \texttt{azimuth\_deg},
+\texttt{centroid\_x}, \texttt{centroid\_y}, \texttt{centroid\_z} i
+\texttt{points\_per\_m}.
+
+% -----------------------------------------------------------------------------
+\subsection{Procjena volumena vokselizacijom}
+\label{ssec:voxel}
+
+Najjednostavniji od četiri implementiranih pristupa procjeni volumena jest
+vokselizacijski: prostor se diskretizira u 3D mrežu kockica (vokseli) zadanog
+brida $s$, a volumen se računa kao broj zauzetih voksela puta $s^3$.
+
+Implementacija u funkciji \texttt{compute\_voxel\_volume} koristi
+\texttt{numpy.floor} indeksiranje:
+
+\begin{equation}
+\label{eq:vox_idx}
+\mathrm{idx}_i \;=\; \left\lfloor \frac{\mathbf{x}_i - \mathbf{x}_{\min}}{s} \right\rfloor,
+\end{equation}
+
+a broj jedinstvenih indeksa nakon \texttt{numpy.unique} predstavlja broj zauzetih
+voksela $N_v$. Ukupan volumen tada glasi:
+
+\begin{equation}
+\label{eq:vox_vol}
+V_{\text{voksel}} \;=\; N_v \cdot s^3.
+\end{equation}
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.8\textwidth]{images/voxelization.png}
+  \caption{Prikaz vokseliziranoga reda vinove loze u 3D prostoru. Svaki
+           voksel (kockica) predstavlja popunjenu ćeliju mreže koja sadrži
+           barem jednu točku oblaka.}
+  \label{fig:voxelization}
+\end{figure}
+
+Veličina brida $s$ računa se adaptivno: u ranoj inačici korišten je
+$s = 0{,}01 \cdot \max(\text{bbox})$, što je za dugačke uzane redove
+($\sim 100$~m duljine, $\sim 1{,}5$~m širine) davalo voksel od $\sim 1$~m i
+ozbiljno precjenjivalo volumen krošnje. Ispravljeno je tako da se uzima
+\emph{najmanja} dimenzija graničnika:
+
+\begin{equation}
+\label{eq:vox_size}
+s \;=\; \mathrm{clip}\bigl(0{,}05 \cdot \min(\text{bbox}), \; 0{,}01, \; 0{,}20\bigr) \; \text{m}.
+\end{equation}
+
+Time je dobivena karakteristična veličina voksela u rasponu $5$--$15$~cm, što
+je usklađeno s gustoćom oblaka točaka (typično $\sim 1$~točka/cm$^2$ u
+multispektralnom skenu).
+
+% -----------------------------------------------------------------------------
+\subsection{Volumen pomoću horizontalnih presjeka}
+\label{ssec:slice}
+
+Drugi pristup procjeni volumena koristi tehniku horizontalnih presjeka
+(\emph{slicing}): oblak se po visini $z$ podijeli na $K = 30$ jednakih slojeva
+debljine $\mathrm{d}z = (z_{\max} - z_{\min}) / K$, u svakom se sloju
+procijeni površina poprečnog presjeka, a ukupni volumen dobiva se zbrajanjem:
+\begin{equation}
+    \label{eq:slice_vol}
+    V_{\text{presjek}} \;=\; \sum_{k=1}^{K} A_k \cdot \mathrm{d}z.
+\end{equation}
+
+Površina $A_k$ procjenjuje se pomoću alpha shape-a: u svakom sloju XY točke
+se prosljeđuju funkciji \texttt{\_alpha\_hull\_area\_2d}, koja gradi
+Delaunayevu triangulaciju i odbacuje trokute čiji opisani polumjer prelazi
+$r_{\max}$. Rubni bridovi preživjelih trokuta projiciraju se u poligone
+pomoću \texttt{shapely.ops.polygonize}, a površina se računa
+\emph{shoelace} formulom, što je egzaktno i za nekonveksne poligone.
+
+\begin{figure}[htbp]
+  \centering
+  \begin{minipage}[t]{0.48\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{images/slicing_method.png}
+  \end{minipage}
+  \hfill
+  \begin{minipage}[t]{0.48\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{images/slicing_method_example2.png}
+  \end{minipage}
+  \caption{Lijevo: prikaz krivulja alpha shape-a oko točaka jednog
+           horizontalnog presjeka stvarnog reda vinograda.
+           Desno: aproksimacija polinomnom ovojnicom oko sintetičkih
+           podataka istog presjeka, kao ilustracija izračuna površine
+           alternativnom metodom.}
+  \label{fig:slicing_detail}
+\end{figure}
+
+Vrijednost $r_{\max}$ procjenjuje se automatski iz medijana udaljenosti
+najbližeg susjeda u XY ravnini (uzorak od $5\,000$ točaka), uz minimalan
+prag od $0{,}5$~m. Bez ovog adaptivnog pristupa, fiksna vrijednost
+$r_{\max}$ pokazala se preuskom za rijetke dijelove krošnje (proizvodeći
+nulte površine) ili preširokom za guste (degenerirajući u konveksnu ljusku).
+Ako alpha-prilagodba ne uspije (premalo trokuta zadovoljava prag), rješenje
+prelazi na konveksnu ljusku kao sigurnosnu mjeru. Taj \emph{fallback} bio je
+ključan jer se na slabo populiranim presjecima na vrhovima krošnje strogi
+alpha-prag rezultirao ne-poligonima, što bi bez sigurnosne grane uzrokovalo
+nulti doprinos sume~\eqref{eq:slice_vol}.
+
+\begin{figure}[htbp]
+  \centering
+  \begin{minipage}[t]{0.48\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{images/slicing_method_example.png}
+  \end{minipage}
+  \hfill
+  \begin{minipage}[t]{0.48\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{images/slicing_method_example3.png}
+  \end{minipage}
+  \caption{Ilustracija \emph{slicing} tehnike na sintetičkim podatcima.
+           Lijevo: 3D prikaz sintetičkog oblaka s horizontalnim presjecima
+           obojanima po visini $z$ --- svaki sloj odgovara jednom članu sume
+           iz jednadžbe~\eqref{eq:slice_vol}.
+           Desno: sintetički podatci korišteni za validaciju postupka.}
+  \label{fig:slicing_synthetic}
+\end{figure}
+
+\paragraph{Eksperimentalni polinomni omotač.}
+Kao analitička alternativa alpha shape pristupu, u bilježnici
+\texttt{polynoms\_volume\_calculation.ipynb} implementirana je i varijanta u
+kojoj se svaki presjek dodatno dijeli po osi $y$ u uske trake, a unutar
+svake trake gornja i donja ovojnica aproksimiraju polinomima 2.\ ili 3.\
+stupnja. Površina presjeka tada se računa analitički kao integral razlike
+gornjeg i donjeg polinoma:
+\begin{equation}
+    \label{eq:poly_area}
+    A_k \;=\; \int_{x_{\min}}^{x_{\max}}
+    \bigl[f^{\uparrow}(x) - f^{\downarrow}(x)\bigr] \, \mathrm{d}x,
+\end{equation}
+a konačni volumen dobiva se identično izrazu~\eqref{eq:slice_vol}. Pristup
+je geometrijski uredan za pravilne kontinuirane krošnje, no osjetljiv na
+praznine koje uzrokuju polinomne oscilacije (\emph{Rungeova pojava}) i
+umjetno povećavaju procijenjenu površinu. Iz tog razloga metoda je zadržana
+kao istraživačka provjera, a kao referentne metrike u Parquet izlazu koriste
+se voksel- i alpha-pristup.
+
+% -----------------------------------------------------------------------------
+\subsection{Spektralne metrike reda}
+\label{ssec:spektri}
+
+Posljednje potpoglavlje obuhvaća izračun statistika NDVI-ja po redu, koje su
+najvažniji indikator zdravlja i intenziteta fotosinteze biljke u preciznoj
+viticulturi.
+
+Funkcija \texttt{compute\_ndvi\_stats} prvo provjerava postoji li
+predizračunata dimenzija \texttt{ndvi} u zaglavlju \texttt{LAS}-a (slučaj iz
+poglavlja~\ref{sec:ndvi}). Ako ne, NDVI se rekompiliira iz polja \texttt{red}
+i \texttt{nir}/\texttt{infrared} prema~\eqref{eq:ndvi}. Dvostruka putanja je
+ostavljena namjerno --- omogućuje primjenu funkcije i nad pred-NDVI inačicama
+podataka iz arhiva.
+
+Iz vektora $\{\mathrm{NDVI}_i\}$ računaju se sljedeća obilježja:
+
+\begin{equation}
+\label{eq:ndvi_stats}
+\begin{aligned}
+&\mathrm{NDVI}_{\mu} = \overline{\mathrm{NDVI}}, \quad
+  \mathrm{NDVI}_{\sigma} = \mathrm{std}(\mathrm{NDVI}), \\
+&\mathrm{NDVI}_{p10} = \mathrm{Q}_{0{,}10}, \quad
+  \mathrm{NDVI}_{p90} = \mathrm{Q}_{0{,}90}, \\
+&\mathrm{NDVI}_{\text{range}} = \mathrm{NDVI}_{p90} - \mathrm{NDVI}_{p10}, \\
+&\mathrm{NDVI}_{\text{low\_frac}} = \frac{|\{i : \mathrm{NDVI}_i < 0{,}2\}|}{N}.
+\end{aligned}
+\end{equation}
+
+Posljednja metrika, $\mathrm{NDVI}_{\text{low\_frac}}$, predstavlja udio točaka
+koje vjerojatno potječu od slabo vegetiranih površina (suho lišće, drvenasti
+dijelovi trsa, sjene), i pokazala se u praksi kao osjetljiviji indikator
+problema u redu od same srednje vrijednosti.
+
+% =============================================================================
+\section{Analiza strukture krošnje po segmentima}
+\label{sec:canopy_structure}
+
+Skripta \texttt{compute\_canopy\_structure.py} izračunava finiji sloj
+strukturnih obilježja krošnje, a tijekom razvoja zahtijevala je značajnu
+preinaku metodologije.
+
+Prva inačica izračunavala je poroznost, udio praznina (\emph{gap fraction}),
+indeks lisne površine (\emph{LAI}) i gustoću lisnog volumena (\emph{LAD})
+\emph{nad cijelim graničnikom reda}. Budući da redovi vinograda u skupu podataka
+imaju duljinu $20$--$110$~m, širinu $1$--$2$~m i visinu $\sim 3$~m, takav
+graničnik proizvodi mrežu od približno $4{,}5 \cdot 10^6$ voksela ($s = 0{,}10$~m),
+a krošnja zauzima samo usku traku unutar njega. Posljedica:
+
+\begin{itemize}
+    \item poroznost $\approx 0{,}99$,
+    \item gap fraction $\approx 0{,}95$,
+    \item LAI proxy $\approx 0{,}1$.
+\end{itemize}
+
+Te vrijednosti su fizikalno besmislene --- mjere koliko zraka okružuje red,
+a ne unutarnju strukturu krošnje. Rješenje je bilo prelazak na
+\emph{segmentiranu} analizu: svaki red se najprije rotira u lokalni
+koordinatni sustav $(u, v, z)$, gdje je $u$ smjer pružanja reda iz PCA, $v$
+poprečni smjer, a $z$ vertikala. Funkcija \texttt{\_estimate\_row\_direction}
+provodi tu rotaciju, a \texttt{\_split\_into\_segments} dijeli red na segmente
+duljine $1$~m duž osi $u$.
+
+Unutar svakog segmenta računa se voksel-mreža \emph{nad lokalnim graničnikom
+segmenta}, a metrike se temelje na njoj. Poroznost je tada definirana kao:
+
+\begin{equation}
+\label{eq:porosity}
+P \;=\; 1 - \frac{N_{\text{popunjenih voksela}}}{n_u \cdot n_v \cdot n_z},
+\end{equation}
+
+a udio praznina kao 2D projekcija u ravninu $v\text{-}z$ (vertikalna stranica
+\emph{canopy wall}-a):
+
+\begin{equation}
+\label{eq:gap_fraction}
+P_{\text{gap}} \;=\; 1 - \frac{|\{(j,k) : \text{barem jedan voksel u koloni } (j,k)\}|}{n_v \cdot n_z}.
+\end{equation}
+
+LAI proxy se izvodi inverzijom Beer-Lambertovog zakona:
+
+\begin{equation}
+\label{eq:lai}
+\mathrm{LAI} \;=\; -\frac{\ln(\max(P_{\text{gap}}, \varepsilon))}{G},
+\end{equation}
+
+gdje je $G = 0{,}5$ vrijednost G-funkcije za sferičnu raspodjelu kuta lišća
+gledanu iz nadira. Gustoća lisnog volumena LAD računa se po vertikalnim
+slojevima dimenzije $\mathrm{d}z = s = 0{,}10$~m:
+
+\begin{equation}
+\label{eq:lad}
+\mathrm{LAD}_k \;=\; -\frac{\ln(\max(P_{\text{gap},k}, \varepsilon))}{G \cdot \mathrm{d}z},
+\end{equation}
+
+a kao reprezentativna vrijednost reda zapisuju se srednja vrijednost te
+percentili $p_{50}$ i $p_{90}$ preko svih segmenata.
+
+Skripta podržava i \emph{multi-voxel-size} način rada (zastavica
+\texttt{--voxel-sizes 0.05 0.10 0.15}), koji pokreće cjelokupni proračun
+zasebno za svaku vrijednost veličine voksela i pohranjuje ih u zasebne
+Parquet datoteke s imenima oblika
+\texttt{voxel050\_row\_canopy\_structure.parquet}. Time je omogućena studija
+osjetljivosti rezultata na izbor diskretizacije, što je u disertaciji važan
+metodološki dodatak.
+
+Eksplicitna napomena u dokumentaciji koda istakla je da svi spomenuti
+pokazatelji predstavljaju \emph{strukturne aproksimacije} izvedene iz
+diskretnih povratnih signala, a ne fizički modelirane biofizikalne veličine.
+Vrijednosti su prikladne za relativne usporedbe redova unutar istog leta, ne
+za apsolutne biofizikalne procjene.
+
+
+%--- ZAKLJUČAK -----------------------------------------------------------------
+\chapter{Zaključak}
+\label{pog:zakljucak}
+
+U radu je prikazan cjelovit obradni postupak za analizu vegetacije vinograda iz
+oblaka točaka prikupljenih bespilotnim letjelicama. Obradni lanac obuhvaća pregled
+i provjeru metapodataka, izdvajanje tla primjenom SMRF postupka, izdvajanje redova
+euklidskim klasteriranjem, izračun NDVI-a po točki i po redu te računanje
+geometrijskih i strukturnih metrika, uključujući visinu, dimenzije reda, volumen i
+pokazatelje strukture krošnje.
+
+Na temelju raspoložive dokumentacije i provedene tehničke analize može se sa
+sigurnošću zaključiti da kombinacija spektralnih i 3D podataka daje bogatiji opis
+vegetacije od pristupa koji bi se oslanjao samo na jedan izvor informacija. Spektralne
+vrijednosti, kao što je NDVI, korisne su za opis vegetacijskog odziva, ali tek u
+kombinaciji s geometrijom reda dobivaju puni interpretacijski smisao. Jednako tako,
+geometrijske mjere poput visine i volumena postaju informativnije kada se mogu
+povezati s raspodjelom spektralnih vrijednosti unutar istog reda.
+
+Također se može zaključiti da je segmentna analiza reda posebno korisna za uske i
+dugačke strukture kakve se pojavljuju u vinogradu. Globalna mjera za cijeli red može
+sakriti lokalne praznine i neujednačenosti, dok analiza po segmentima omogućuje
+detaljniji uvid u poroznost, raspored biljne mase i promjene duž reda. Time se
+otvara prostor za precizniju agronomsku interpretaciju i ciljaniju analizu problematičnih
+dijelova nasada.
+
+Važan zaključak rada odnosi se i na kvalitetu ulaznih metapodataka. Pokazalo se da
+koordinatni sustav nije konzistentno i potpuno zapisan u svim raspoloživim
+datotekama. Zbog toga provjera i propagacija CRS informacija nisu samo tehnički
+detalj, nego nužan preduvjet pouzdane geoprostorne obrade. U radu je zato
+prostorna referenca tretirana kao sastavni dio obradnog lanca, a ne kao sporedna
+informacija.
+
+Za budući rad prirodno se nameće nekoliko smjerova. Prvi je detaljnija validacija
+volumnih i strukturnih metrika u odnosu na terenska opažanja ili neovisna mjerenja.
+Drugi je razvoj stabilnijeg postupka za automatsko usklađivanje koordinatnih sustava
+i standardizaciju metapodataka pri ulazu. Treći je proširenje rada prema semantičkoj
+segmentaciji, za što u repozitoriju već postoji početna infrastrukturna osnova, ali još
+ne i označeni skupovi podataka i trenirani modeli. Konačno, korisno bi bilo ispitati
+kako se metrički opisi redova mogu povezati s vremenskim nizovima snimanja i s
+konkretnim agronomskim pokazateljima.
+
+Ovaj rad stoga treba promatrati kao čvrsto utemeljen produkcijski okvir za obradu
+višesenzorskih oblaka točaka u vinogradarstvu, ali i kao polazište za daljnje
+istraživanje i proširenje prema još naprednijim metodama prostorne analize.
+
+
+%--- LITERATURA / REFERENCES ---------------------------------------------------
+
+% Upiši ime BibTeX datoteke bez .bib nastavka
+\bibliography{literatura}
+
+
+%--- SAŽETAK / ABSTRACT --------------------------------------------------------
+
+% Sažetak na hrvatskom
+\begin{sazetak}
+U radu se razmatra procjena vegetacijskih indeksa i geometrijskih pokazatelja
+vegetacije primjenom podataka prikupljenih bespilotnim letjelicama iznad
+vinograda. Korišteni su multispektralni, infracrveni i LiDAR oblaci točaka u
+LAS/LAZ formatu. Razvijen je obradni postupak koji obuhvaća provjeru metapodataka,
+uklanjanje tla primjenom SMRF postupka, izdvajanje redova euklidskim klasteriranjem,
+izračun NDVI-a po točki te računanje metrika po redu, uključujući visinu, geometriju,
+volumen i pokazatelje strukture krošnje. Posebna je pozornost posvećena segmentnoj
+analizi reda, kojom se opisuju poroznost i aproksimacije pokazatelja LAI i LAD.
+Rezultat rada je cjelovit i reproduktivan cjevovod za analizu vegetacije vinove loze
+utemeljen na kombinaciji spektralnih i 3D informacija.
+\end{sazetak}
+
+\begin{kljucnerijeci}
+  vegetacijski indeksi; bespilotne letjelice; NDVI; LiDAR; vinograd; oblak točaka; precizna poljoprivreda
+\end{kljucnerijeci}
+
+
+% Abstract in English
+\begin{abstract}
+This thesis addresses the estimation of vegetation indices and geometric vegetation
+descriptors using data collected by unmanned aerial vehicles over vineyards. The
+input consists of multispectral, infrared and LiDAR point clouds stored in the LAS/LAZ
+format. A processing pipeline is developed that includes metadata inspection, SMRF-based
+ground removal, vineyard-row extraction by Euclidean clustering, per-point NDVI
+computation, and per-row feature extraction including height, geometry, volume and
+canopy-structure descriptors. Special attention is given to segment-based canopy
+analysis, which provides porosity and proxy estimates of LAI and LAD along the row.
+The main outcome of the thesis is a complete and reproducible pipeline for vineyard
+vegetation analysis based on the joint use of spectral and 3D information.
+\end{abstract}
+
+\begin{keywords}
+  vegetation indices; unmanned aerial vehicles; NDVI; LiDAR; vineyard; point cloud; precision agriculture
+\end{keywords}
+
+
+%--- PRIVITCI / APPENDIX -------------------------------------------------------
+
+\backmatter
+
+\chapter{Dodatak: Implementacijski detalji}
+\label{pog:dodatak}
+
+U dodatak možeš staviti:
+\begin{itemize}
+    \item dodatne tablice i grafove,
+    \item tehničke detalje implementacije,
+    \item isječke koda,
+    \item dodatne rezultate koji bi opteretili glavni tekst rada.
+\end{itemize}
+
+% Preporučeni sadržaj dodatka za ovu temu:
+% \begin{itemize}
+%     \item tablica svih korištenih LAS/LAZ datoteka i njihovih atributa,
+%     \item prikaz CRS metapodataka po datoteci,
+%     \item isječci ključnih dijelova skripti:
+%           smrf_ground_classification.py,
+%           clustering_only.cpp,
+%           pcd_to_ndvi_las.py,
+%           compute_row_features.py,
+%           compute_canopy_structure.py,
+%     \item dodatni grafovi osjetljivosti na parametre voxel_size,
+%           cluster_tolerance i segment_length,
+%     \item dodatne vizualizacije redova koje nisu stale u glavni tekst rada.
+% \end{itemize}
+
+\end{document}
