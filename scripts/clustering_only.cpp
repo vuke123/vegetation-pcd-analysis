@@ -172,6 +172,22 @@ static bool loadPCDWithAttrs(const std::string& filename,
     return true;
 }
 
+// Read a tunable parameter from the environment (exported by run_pipeline.sh
+// from pipeline_config.env). Falls back to the original hardcoded default.
+static float env_float(const char* key, float def)
+{
+    const char* v = std::getenv(key);
+    if (v && *v) { try { return std::stof(v); } catch (...) {} }
+    return def;
+}
+
+static int env_int(const char* key, int def)
+{
+    const char* v = std::getenv(key);
+    if (v && *v) { try { return std::stoi(v); } catch (...) {} }
+    return def;
+}
+
 int main()
 {
     const std::string out_dir = "out_cluster";
@@ -183,10 +199,16 @@ int main()
     const bool SAVE_CLUSTERS = true;
 
     std::vector<float> leaf_sizes         = {0.00f};  // keep 0 for now
-    std::vector<float> cluster_tolerances = {0.4f};
+    std::vector<float> cluster_tolerances = {env_float("CLUSTER_TOLERANCE", 0.4f)};
 
-    const int MIN_CLUSTER_SIZE = 50000;
-    const int MAX_CLUSTER_SIZE = 850000;
+    const int MIN_CLUSTER_SIZE   = env_int("MIN_CLUSTER_SIZE", 50000);
+    const int MAX_CLUSTER_SIZE   = env_int("MAX_CLUSTER_SIZE", 850000);
+    const int MAX_VALID_CLUSTERS = env_int("MAX_VALID_CLUSTERS", 50);
+
+    std::cout << "=== clustering_only (config) ===\n"
+              << "tol=" << cluster_tolerances[0] << " m"
+              << " | min/max=" << MIN_CLUSTER_SIZE << "/" << MAX_CLUSTER_SIZE
+              << " | max_valid=" << MAX_VALID_CLUSTERS << "\n";
 
     std::ofstream log(out_dir + "/clustering_only_log.csv", std::ios::out);
     log << "timestamp,config_id,leaf_m,tol_m,input_pts,clusters,valid,reason,input_file\n";
@@ -250,7 +272,7 @@ int main()
             double cluster_s =
                 std::chrono::duration_cast<std::chrono::milliseconds>(c1 - c0).count() / 1000.0;
 
-            const bool valid = (cluster_indices.size() <= 50);
+            const bool valid = (static_cast<int>(cluster_indices.size()) <= MAX_VALID_CLUSTERS);
             const std::string reason = valid ? "ok" : "too_many_clusters";
 
             std::cout << "clusters=" << cluster_indices.size()

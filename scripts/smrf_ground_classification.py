@@ -25,12 +25,18 @@ except Exception as exc:
     raise ImportError("open3d is required for visualization. Please install it with `pip install open3d`.") from exc
 
 
-DEFAULT_SMRF_PARAMS: Dict[str, float] = {
-    "slope": 0.15,
-    "window": 16.0,
-    "threshold": 0.5,
-    "scalar": 1.25,
-}
+# SMRF defaults come from the shared pipeline config (pipeline_config.env).
+# Fall back to the original hardcoded values if the loader isn't importable
+# (e.g. when this module is used from an unrelated working directory).
+try:
+    from pipeline_config import SMRF_PARAMS as DEFAULT_SMRF_PARAMS
+except Exception:  # pragma: no cover - preserve original behaviour
+    DEFAULT_SMRF_PARAMS: Dict[str, float] = {
+        "slope": 0.15,
+        "window": 16.0,
+        "threshold": 0.5,
+        "scalar": 1.25,
+    }
 
 
 def _build_pdal_pipeline_dict(input_path: str, output_path: str, smrf_params: Dict[str, float]) -> Dict:

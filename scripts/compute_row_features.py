@@ -28,15 +28,40 @@ from scipy.spatial import Delaunay, ConvexHull, cKDTree
 from shapely.geometry import LineString
 from shapely.ops import polygonize
 
+# Tunable parameters come from the shared pipeline config (pipeline_config.env);
+# fall back to the original hardcoded values if the loader isn't importable.
+try:
+    from pipeline_config import (
+        RANSAC_LOW_FRACTION,
+        RANSAC_N_ITER,
+        RANSAC_DIST_THRESH,
+        VOXEL_AUTO_FACTOR,
+        VOXEL_AUTO_MIN,
+        VOXEL_AUTO_MAX,
+        SLICE_N_SLICES,
+        NDVI_EPS,
+        NDVI_LOW_THRESHOLD,
+    )
+except Exception:  # pragma: no cover - preserve original behaviour
+    RANSAC_LOW_FRACTION = 0.10
+    RANSAC_N_ITER = 200
+    RANSAC_DIST_THRESH = 0.10
+    VOXEL_AUTO_FACTOR = 0.05
+    VOXEL_AUTO_MIN = 0.01
+    VOXEL_AUTO_MAX = 0.20
+    SLICE_N_SLICES = 30
+    NDVI_EPS = 1e-6
+    NDVI_LOW_THRESHOLD = 0.2
+
 
 # ---------------------------------------------------------------------------
 # 1. Slope-aware height estimation
 # ---------------------------------------------------------------------------
 
 def _ransac_ground_plane(points: np.ndarray,
-                         low_fraction: float = 0.10,
-                         n_iter: int = 200,
-                         dist_thresh: float = 0.10) -> tuple[np.ndarray, float]:
+                         low_fraction: float = RANSAC_LOW_FRACTION,
+                         n_iter: int = RANSAC_N_ITER,
+                         dist_thresh: float = RANSAC_DIST_THRESH) -> tuple[np.ndarray, float]:
     """
     Fit a plane to the lowest `low_fraction` of points by Z using RANSAC.
 
@@ -188,8 +213,8 @@ def compute_voxel_volume(points: np.ndarray, voxel_size: float | None = None) ->
         # Use the *smallest* bounding extent to set voxel size,
         # capped between 1cm and 20cm.  For long narrow vine rows
         # using max(bounds) produces ~1m voxels which is too coarse.
-        voxel_size = float(min(bounds) * 0.05)
-        voxel_size = max(0.01, min(voxel_size, 0.20))
+        voxel_size = float(min(bounds) * VOXEL_AUTO_FACTOR)
+        voxel_size = max(VOXEL_AUTO_MIN, min(voxel_size, VOXEL_AUTO_MAX))
 
     min_bound = points.min(axis=0)
     indices = np.floor((points - min_bound) / voxel_size).astype(np.int64)
@@ -265,7 +290,7 @@ def _alpha_hull_area_2d(points_xy: np.ndarray, rmax: float) -> float:
 
 
 def compute_slice_volume(points: np.ndarray,
-                         n_slices: int = 30,
+                         n_slices: int = SLICE_N_SLICES,
                          rmax: float | None = None) -> dict:
     """
     Slice the point cloud along Z, compute alpha-hull area per slice,
@@ -338,8 +363,7 @@ def compute_ndvi_stats(las) -> dict:
             red = np.array(las.red, dtype=np.float64)
             nir_field = "nir" if "nir" in dim_names else "infrared"
             nir = np.array(getattr(las, nir_field), dtype=np.float64)
-            eps = 1e-6
-            ndvi = (nir - red) / (nir + red + eps)
+            ndvi = (nir - red) / (nir + red + NDVI_EPS)
 
     if ndvi is None or len(ndvi) == 0:
         return {
@@ -355,7 +379,7 @@ def compute_ndvi_stats(las) -> dict:
         "ndvi_std": float(np.std(ndvi)),
         "ndvi_p10": p10,
         "ndvi_p90": p90,
-        "ndvi_low_frac": float(np.mean(ndvi < 0.2)),
+        "ndvi_low_frac": float(np.mean(ndvi < NDVI_LOW_THRESHOLD)),
         "ndvi_range": p90 - p10,
     }
 
@@ -446,7 +470,7 @@ def main():
     parser.add_argument("--pattern", default="*_ndvi.las", help="Glob pattern for cluster files")
     parser.add_argument("--source-las", default=None, help="Source LAS to extract CRS from")
     parser.add_argument("--voxel-size", type=float, default=None, help="Voxel size in meters (default: auto)")
-    parser.add_argument("--n-slices", type=int, default=30, help="Number of Z-slices for slice volume")
+    parser.add_argument("--n-slices", type=int, default=SLICE_N_SLICES, help="Number of Z-slices for slice volume")
     args = parser.parse_args()
 
     in_dir = Path(args.in_dir)

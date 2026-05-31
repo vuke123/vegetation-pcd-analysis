@@ -1,0 +1,3 @@
+method,best_param,volume_m3,true_m3,signed_err_%,abs_err_%
+voxelization,s=0.092 m,8.463,8.116,4.27,4.27
+slice+alpha,rmax=0.428 m,8.297,8.116,2.23,2.23

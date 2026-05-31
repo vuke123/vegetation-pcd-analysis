@@ -10,6 +10,13 @@ import laspy
 # pip install pypcd4
 from pypcd4 import PointCloud
 
+# NDVI stabiliser comes from the shared pipeline config (pipeline_config.env);
+# fall back to the original hardcoded value if the loader isn't importable.
+try:
+    from pipeline_config import NDVI_EPS
+except Exception:  # pragma: no cover - preserve original behaviour
+    NDVI_EPS = 1e-6
+
 
 def _pcd_to_dataframe_all_fields(pcd_path: str) -> pd.DataFrame:
     """
@@ -54,7 +61,7 @@ def add_ndvi(df: pd.DataFrame,
              red_col: str = "red",
              nir_col: str = "infrared",
              out_col: str = "ndvi",
-             eps: float = 1e-6) -> pd.DataFrame:
+             eps: float = NDVI_EPS) -> pd.DataFrame:
     """
     NDVI = (NIR - Red) / (NIR + Red)
     """

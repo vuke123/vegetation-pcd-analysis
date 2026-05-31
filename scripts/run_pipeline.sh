@@ -5,12 +5,39 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$ROOT_DIR"
 
+# --- Load shared tunable parameters ------------------------------------------
+# All knobs (SMRF, clustering, volume, NDVI, RANSAC) live in pipeline_config.env.
+# `set -a` exports every value so the Python SMRF step and the C++ clustering
+# binary inherit the exact same parameters. Missing config => built-in defaults.
+if [ -z "${PIPELINE_CONFIG:-}" ]; then
+  _cfg_dir="$ROOT_DIR"
+  while [ "$_cfg_dir" != "/" ]; do
+    if [ -f "$_cfg_dir/pipeline_config.env" ]; then
+      PIPELINE_CONFIG="$_cfg_dir/pipeline_config.env"
+      break
+    fi
+    _cfg_dir="$(dirname "$_cfg_dir")"
+  done
+fi
+if [ -n "${PIPELINE_CONFIG:-}" ] && [ -f "$PIPELINE_CONFIG" ]; then
+  echo "Loading pipeline config: $PIPELINE_CONFIG"
+  set -a
+  # shellcheck disable=SC1090
+  . "$PIPELINE_CONFIG"
+  set +a
+  export PIPELINE_CONFIG
+else
+  echo "WARNING: pipeline_config.env not found; using built-in defaults." >&2
+fi
+
+# The input cloud is passed as $1; the no-arg fallback default stays here
+# because each pipeline ships a different sample cloud.
 INPUT_LAS_DEFAULT="../datasource/2025-07-15-MS_Vinograd_1.las"
 INPUT_LAS="${1:-$INPUT_LAS_DEFAULT}"
 
-OUT_GROUND_DIR="./out_ground"
-OUT_CLUSTER_DIR="./out_cluster"
-OUT_CLUSTER_LAS_DIR="./out_cluster_las"
+OUT_GROUND_DIR="${OUT_GROUND_DIR:-./out_ground}"
+OUT_CLUSTER_DIR="${OUT_CLUSTER_DIR:-./out_cluster}"
+OUT_CLUSTER_LAS_DIR="${OUT_CLUSTER_LAS_DIR:-./out_cluster_las}"
 FINAL_LAS="$OUT_CLUSTER_LAS_DIR/merged_clusters_ndvi.las"
 
 echo "=== [0/6] Cleaning output folders (out_ground, out_cluster, out_cluster_las) ==="
