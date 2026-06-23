@@ -176,7 +176,7 @@ Canopy-volume methods plus the sensitivity and synthetic-validation studies.
 | `enhanced_volume_calculation.ipynb` | Alpha-shape / concave-hull volume estimation. |
 | `voxelization.ipynb`, `read_plot_voxelization.ipynb` | Voxelization experiments and plotting. |
 
-![Volume vs voxel size](images/volume_vs_voxel_size.png)
+![Volume vs voxel size](images/volume_vs_alpha_radius.png)
 
 ### `analysis/` — comparisons & spectral analysis
 
