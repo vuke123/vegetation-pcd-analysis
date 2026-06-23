@@ -103,6 +103,8 @@ START_TIME=$(date +%s)
 # Run SMRF ground classification using existing Python script
 # -----------------------------------------------------------------------------
 cd "$SCRIPTS_DIR"
+# Core pipeline modules live in scripts/pipeline/; expose them to the inline step.
+export PYTHONPATH="$SCRIPTS_DIR/pipeline${PYTHONPATH:+:$PYTHONPATH}"
 
 NON_GROUND_LAS=$(
   INPUT_LAS="$INPUT_MS" OUT_GROUND_DIR="$OUT_DIR" \

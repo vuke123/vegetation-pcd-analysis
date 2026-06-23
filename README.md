@@ -1,140 +1,336 @@
 # Vegetation Point Cloud Analysis
 
-> Automated pipeline for extracting vegetation metrics from multispectral LiDAR point clouds for vineyard analysis
+> Automated pipeline for extracting per-row vegetation metrics from multispectral
+> LiDAR / drone point clouds for precision viticulture.
 
 ![Whole Vineyard](images/vineyard.png)
 
-## Overview
+## What is in this repository?
 
-This project processes multispectral LiDAR and infrared point cloud data to extract quantitative vegetation metrics for precision agriculture, with a focus on vineyard analysis. The pipeline supports both local execution and an Azure-native deployment, and covers the full workflow from raw LAS/LAZ files to row-level feature outputs.
+This repo turns a raw multispectral LAS/LAZ point cloud of a vineyard (or olive
+grove) into an analysis-ready table of **per-row vegetation metrics** — NDVI,
+canopy volume, height, geometry and temperature. It contains four things:
 
-Main outputs include:
+| # | Component | Folder | What it is |
+|---|-----------|--------|------------|
+| 1 | **Processing pipeline** | [`scripts/`](scripts/) | The core scripts (Python + C++) and the experiments/notebooks behind the thesis. Run end-to-end with [`scripts/run_pipeline.sh`](scripts/run_pipeline.sh). |
+| 2 | **Web app** | [`vineyard_app/`](vineyard_app/) | Upload a `.las`, the backend runs the pipeline, the frontend renders the clustered rows in an interactive 3D viewer with metric tables. |
+| 3 | **Cloud deployment** | [`azure_platform/`](azure_platform/) | The same pipeline split into 3 containerised jobs for scalable execution on Azure. |
+| 4 | **Documentation & assets** | [`docs/`](docs/), [`images/`](images/), [`research_papers/`](research_papers/) | Method report, figures, and the reference papers. |
 
-- ground / non-ground classification
-- plant and row segmentation
-- NDVI calculation from multispectral bands
-- volume estimation using multiple geometric methods
-- temperature and quality-control metrics
-- Parquet-based feature tables for downstream analytics
+The data flow end-to-end:
 
-The overall data flow is:
-
-`Raw LAS/LAZ → Ground Removal → Clustering / Segmentation → NDVI / Volume Features → Parquet Output`
+```text
+Raw LAS/LAZ ──► Ground removal (SMRF) ──► Clustering / row segmentation (PCL)
+            ──► NDVI tagging ──► Per-row feature extraction ──► row_features.parquet
+```
 
 ---
 
-## Pipeline
+## Table of contents
 
-### Ground Removal
+- [Repository structure](#repository-structure)
+- [Quick start](#quick-start)
+  - [Run the full pipeline locally](#run-the-full-pipeline-locally)
+  - [Run the web app](#run-the-web-app)
+  - [Run on Azure](#run-on-azure)
+- [The `scripts/` directory, grouped by purpose](#the-scripts-directory-grouped-by-purpose)
+  - [`pipeline/` — production pipeline modules](#pipeline--production-pipeline-modules)
+  - [`clustering/` — C++ / PCL clustering](#clustering--c--pcl-clustering)
+  - [`volume/` — volume estimation & validation](#volume--volume-estimation--validation)
+  - [`analysis/` — comparisons & spectral analysis](#analysis--comparisons--spectral-analysis)
+  - [`visualization/` — result viewers](#visualization--result-viewers)
+  - [`ml/` — learned representations](#ml--learned-representations)
+  - [`synthetic/` — synthetic data generator](#synthetic--synthetic-data-generator)
+  - [`alternatives/` — earlier / experimental approaches](#alternatives--earlier--experimental-approaches)
+- [Pipeline stages explained](#pipeline-stages-explained)
+- [Methods and algorithms](#methods-and-algorithms)
+- [Configuration](#configuration)
+- [Data layout](#data-layout)
+- [Tech stack](#tech-stack)
+- [Outputs](#outputs)
+- [Project goal](#project-goal)
 
-Ground points are removed using the **SMRF (Simple Morphological Filter)** algorithm through PDAL. This step separates terrain from vegetation and prepares the point cloud for downstream segmentation.
+---
 
-Key script:
-- `scripts/smrf_ground_classification.py`
+## Repository structure
 
-Features:
-- PDAL Python bindings support
-- CLI fallback when bindings are unavailable
-- terrain-adaptive filtering with configurable SMRF parameters
+```text
+vegetation-pcd-analysis/
+├── scripts/                     # Processing pipeline + experiments
+│   ├── run_pipeline.sh          # ► End-to-end pipeline entry point
+│   ├── run_features.sh          # ► Feature-only re-run (reuses cluster LAS)
+│   ├── pipeline/                # Core, importable production modules
+│   ├── clustering/              # C++ / PCL Euclidean clustering (CMake build)
+│   ├── volume/                  # Volume estimation: sensitivity + validation
+│   ├── analysis/                # SMRF/RANSAC & NDVI/species comparisons
+│   ├── visualization/           # Result viewers (notebooks + scripts)
+│   ├── ml/                      # Point-cloud transformer autoencoder (research)
+│   ├── synthetic/               # Synthetic point-cloud generator
+│   ├── alternatives/            # Earlier / experimental approaches
+│   └── out_ground|out_cluster|out_cluster_las/   # Pipeline outputs (gitignored)
+├── vineyard_app/                # FastAPI + React web app over the pipeline
+├── azure_platform/              # Containerised 3-job pipeline for Azure
+├── segmentation_baseline/       # Learning-based segmentation baseline
+├── docs/                        # Method report (canopy structure)
+├── images/                      # README figures and result plots
+├── research_papers/             # Reference literature
+└── README.md
+```
 
-![Removed Ground from the Field](images/ground_removed.png)
+> **Note on running scripts.** The core production modules live in
+> `scripts/pipeline/`. The entry scripts `run_pipeline.sh` / `run_features.sh`
+> stay at the top of `scripts/` (the web app and Azure jobs call them by that
+> path) and invoke the pipeline modules via `pipeline/…`. Analysis/volume
+> scripts that reuse a production module add `scripts/pipeline/` to `sys.path`
+> automatically, so they run from anywhere.
 
-### Clustering & Segmentation
+---
 
-Vegetation points are segmented into individual plants or vine sections using point cloud clustering. The production implementation is written in **C++ with PCL**, using Euclidean clustering for performance and scalability.
+## Quick start
 
-Key script:
-- `scripts/clustering_only.cpp`
+### Run the full pipeline locally
 
-Features:
-- Euclidean cluster extraction with PCL
-- optional voxel downsampling
-- outlier removal before clustering
-- support for parameter sweeps and cluster export
+Requires Python 3.10+, PDAL, PCL and CMake (see [Tech stack](#tech-stack)).
+
+```bash
+cd scripts
+./run_pipeline.sh ../datasource/flights/2025-07-15-MS_Vinograd_1.las
+```
+
+This runs all six stages and produces, in `scripts/out_cluster_las/`:
+
+- `row_features.parquet` — per-row metrics (volumes, NDVI, height, geometry)
+- `merged.las` — merged NDVI-tagged point cloud
+
+The first run configures and builds the C++ clustering target automatically
+(`scripts/clustering/build/`). To recompute only the feature tables from
+existing cluster LAS files:
+
+```bash
+cd scripts
+./run_features.sh ../datasource/flights/2025-07-15-MS_Vinograd_1.las
+```
+
+### Run the web app
+
+See [`vineyard_app/README.md`](vineyard_app/README.md). The backend runs
+`scripts/run_pipeline.sh` per upload and serialises jobs; the frontend renders
+the clustered rows in 3D with metric tables.
+
+### Run on Azure
+
+See [`azure_platform/README.md`](azure_platform/README.md):
+
+```bash
+cd azure_platform
+./run_all.sh --input ../datasource/flights/07-15-MS.laz
+```
+
+---
+
+## The `scripts/` directory, grouped by purpose
+
+### `pipeline/` — production pipeline modules
+
+The core, importable modules that `run_pipeline.sh` / `run_features.sh` drive.
+
+| File | Role |
+|------|------|
+| `pipeline_config.py` | Loads `pipeline_config.env` and exposes typed constants (SMRF, clustering, volume, NDVI, RANSAC). Single source of truth for tunables. |
+| `smrf_ground_classification.py` | SMRF ground/non-ground separation via PDAL (Python bindings, CLI fallback). |
+| `pcd_to_ndvi_las.py` | Tags each cluster PCD with NDVI and writes it back out as LAS. |
+| `compute_row_features.py` | Per-row geometric & radiometric features → `row_features.parquet` (voxel/slice/hull/polynomial volumes, NDVI stats, bbox, temperature). |
+| `compute_canopy_structure.py` | Segment-based canopy structure metrics (porosity, gap fraction, Beer–Lambert LAI proxy). |
+| `merge_las_points.py` | LAS merge helper utility. |
+
+### `clustering/` — C++ / PCL clustering
+
+| File | Role |
+|------|------|
+| `clustering_only.cpp` | Production Euclidean clustering (`pcl::EuclideanClusterExtraction`) with optional voxel downsampling and outlier removal. |
+| `CMakeLists.txt` | Build definition (also builds the experimental C++ targets in `../alternatives/`). |
+| `clustering_params.txt` | Reference notes for clustering parameters. |
+
+Build manually if needed:
+
+```bash
+cmake -S scripts/clustering -B scripts/clustering/build -DCMAKE_BUILD_TYPE=Release
+cmake --build scripts/clustering/build -j
+```
 
 ![Clustered Vineyard Rows](images/clustering.png)
 
-### Volume Estimation
+### `volume/` — volume estimation & validation
 
-The repository includes several approaches for canopy volume estimation, allowing comparison between speed, robustness, and geometric precision.
+Canopy-volume methods plus the sensitivity and synthetic-validation studies.
 
-Implemented methods include:
-- **Voxel-based volume** for fast approximation
-- **Slicing-based volume** for structured analysis
-- **Convex hull volume** as a simple baseline
-- **Polynomial envelope fitting** for analytically integrated slice areas
-- **Alpha-shape / concave hull methods** for complex plant geometry
+| File | Role |
+|------|------|
+| `volume_sensitivity.py` | Sweeps voxel size / alpha radius for the production volume estimators. |
+| `volume_sensitivity_experiment.py` | Extended sensitivity experiment (incl. convex-hull baseline, hole-filling). |
+| `lai_voxel_size_sensitivity.py` | Voxel-size sensitivity of the Beer–Lambert LAI proxy. |
+| `synthetic_volume_validation.ipynb` | Validates estimators on synthetic clouds of **known** volume. |
+| `synthetic_volume_validation_extra.ipynb` | Additional synthetic scenes (two-row, olive grove). |
+| `polynoms_volume_calculation.ipynb` | Polynomial envelope volume estimation. |
+| `enhanced_volume_calculation.ipynb` | Alpha-shape / concave-hull volume estimation. |
+| `voxelization.ipynb`, `read_plot_voxelization.ipynb` | Voxelization experiments and plotting. |
 
-Volume-related notebooks:
-- `enhanced_volume_calculation.ipynb`
-- `polynoms_volume_calculation.ipynb`
-- `read_plot_voxelization.ipynb`
+![Volume vs voxel size](images/volume_vs_voxel_size.png)
 
-### NDVI Calculation
+### `analysis/` — comparisons & spectral analysis
 
-NDVI is computed directly from multispectral point cloud attributes using the standard formula:
+| File | Role |
+|------|------|
+| `compare_smrf_ransac.py` | SMRF (default vs tuned) vs single-plane RANSAC ground-fit comparison figures. |
+| `compare_ndvi_species.py` | NDVI distribution comparison across species. |
+| `inspect_laz_files.ipynb` | Quick inspection of LAS/LAZ contents. |
+
+![SMRF comparison](images/smrf_comparison.png)
+![NDVI species comparison](images/ndvi_species_compare.png)
+
+### `visualization/` — result viewers
+
+| File | Role |
+|------|------|
+| `visualize_row_metrics.ipynb` | Visualises the per-row metrics in `row_features.parquet`. |
+| `visualize_tutorial_clusters.py` | Renders clustering results. |
+
+### `ml/` — learned representations
+
+| File | Role |
+|------|------|
+| `pointcloud_transformer_autoencoder.py` | Experimental transformer autoencoder for learned point-cloud representation. |
+| `ae_downsample_reconstruct_demo.py` | Downsample-and-reconstruct demo using the autoencoder. |
+
+### `synthetic/` — synthetic data generator
+
+| File | Role |
+|------|------|
+| `objct_generator.py` | Generates synthetic point-cloud objects for controlled tests. |
+
+### `alternatives/` — earlier / experimental approaches
+
+Self-contained earlier iterations kept for reference: C++ alternatives
+(`convert_to_ply.cpp`, `ground_removal_only.cpp`, `pcl_clustering.cpp`, built by
+`clustering/CMakeLists.txt`) and exploratory notebooks/scripts
+(data exploration, rasterizing, tiling, clustering analysis, NDVI calculation).
+
+---
+
+## Pipeline stages explained
+
+### 1. Ground removal
+
+Ground points are removed with the **SMRF (Simple Morphological Filter)**
+algorithm through PDAL, separating terrain from vegetation.
+
+- Script: `scripts/pipeline/smrf_ground_classification.py`
+- PDAL Python bindings with a CLI fallback; terrain-adaptive, configurable SMRF parameters.
+
+![Removed Ground from the Field](images/ground_removed.png)
+
+### 2. Clustering & segmentation
+
+Vegetation points are segmented into rows/plants. The production implementation
+is **C++ with PCL** Euclidean clustering for performance and scalability.
+
+- Script: `scripts/clustering/clustering_only.cpp`
+- Euclidean cluster extraction, optional voxel downsampling, outlier removal, parameter sweeps, cluster export.
+
+### 3. NDVI calculation
+
+NDVI is computed directly from the multispectral attributes:
 
 `NDVI = (NIR - Red) / (NIR + Red)`
 
-Key script:
-- `scripts/pcd_to_ndvi_las.py`
+- Script: `scripts/pipeline/pcd_to_ndvi_las.py`
+- NDVI exported as an extra LAS dimension; original attributes preserved.
 
-Features:
-- multispectral LAS/LAZ support
-- NDVI export as an extra LAS dimension
-- preservation of original point cloud attributes
-- per-row vegetation health analysis
+### 4. Volume estimation
 
-### Feature Extraction
+Several approaches trade off speed, robustness and geometric precision:
 
-The final stage aggregates geometric and spectral properties into analysis-ready outputs.
+- **Voxel-based volume** — fast approximation
+- **Slicing-based volume** — structured analysis
+- **Convex hull volume** — simple baseline
+- **Polynomial envelope fitting** — analytically integrated slice areas
+- **Alpha-shape / concave hull** — complex plant geometry
 
-Extracted features include:
+Notebooks: `scripts/volume/enhanced_volume_calculation.ipynb`,
+`scripts/volume/polynoms_volume_calculation.ipynb`,
+`scripts/volume/read_plot_voxelization.ipynb`.
+
+### 5. Feature extraction
+
+The final stage aggregates geometric and spectral properties into
+analysis-ready outputs:
+
 - NDVI statistics
 - row / cluster bounding boxes
-- voxel, slice, hull, and polynomial volume estimates
+- voxel, slice, hull and polynomial volume estimates
 - temperature summaries from infrared data
-- quality-control and disagreement metrics across methods
+- quality-control / disagreement metrics across methods
 
 ---
 
-## Methods and Algorithms
+## Methods and algorithms
 
-### SMRF Ground Classification
+### SMRF ground classification
 
-Ground removal uses PDAL’s SMRF filter with configurable slope, window, threshold, and scalar parameters. This provides robust terrain separation in agricultural scenes with uneven ground.
+Ground removal uses PDAL's SMRF filter with configurable slope, window,
+threshold and scalar parameters. This provides robust terrain separation in
+agricultural scenes with uneven ground.
 
-### PCL Euclidean Clustering
+### PCL Euclidean clustering
 
-The main clustering implementation uses `pcl::EuclideanClusterExtraction` for high-performance segmentation. It is designed for production use and supports filtering, downsampling, and batch parameter evaluation.
+The main clustering implementation uses `pcl::EuclideanClusterExtraction` for
+high-performance segmentation. It is designed for production use and supports
+filtering, downsampling and batch parameter evaluation.
 
-### Polynomial Slice-Based Volume
+### Polynomial slice-based volume
 
 The polynomial method estimates canopy volume by:
 
-1. slicing the point cloud along the Z axis  
-2. splitting each slice along Y  
-3. extracting upper and lower envelopes along X  
-4. fitting adaptive quadratic or cubic polynomials  
-5. analytically integrating the area between curves  
-6. summing slice areas across height  
+1. slicing the point cloud along the Z axis
+2. splitting each slice along Y
+3. extracting upper and lower envelopes along X
+4. fitting adaptive quadratic or cubic polynomials
+5. analytically integrating the area between curves
+6. summing slice areas across height
 
-This method is the most geometrically detailed approach in the repository.
+This is the most geometrically detailed approach in the repository.
 
-### Alpha Shape Volume Estimation
+### Alpha shape volume estimation
 
-The enhanced volume workflow uses slice-wise clustering and 2D alpha shapes to reconstruct concave boundaries. Polygon area is computed exactly with the shoelace formula, making this approach robust for irregular vegetation structure.
+The enhanced volume workflow uses slice-wise clustering and 2D alpha shapes to
+reconstruct concave boundaries. Polygon area is computed exactly with the
+shoelace formula, making this robust for irregular vegetation structure.
 
-### Deep Learning / Research Components
+### Deep learning / research components
 
-The repository also contains an experimental point cloud transformer autoencoder pipeline for learned point cloud representation and segmentation research.
+The repository also contains an experimental point cloud transformer autoencoder
+for learned point-cloud representation and segmentation research.
 
-Key file:
-- `pointcloud_transformer_autoencoder.py`
+- Key file: `scripts/ml/pointcloud_transformer_autoencoder.py`
+
+A more detailed write-up of the per-row and canopy-structure metrics lives in
+[`docs/canopy_structure_report.md`](docs/canopy_structure_report.md).
 
 ---
 
-## Data
+## Configuration
+
+All tunable knobs (SMRF, clustering, volume, NDVI, RANSAC) live in a single
+`pipeline_config.env` file, located by walking up the directory tree from the
+pipeline. `run_pipeline.sh` exports every value (`set -a`) so both the Python
+SMRF step and the C++ clustering binary inherit the exact same parameters.
+`scripts/pipeline/pipeline_config.py` reads it and exposes typed constants;
+missing config falls back to built-in defaults.
+
+---
+
+## Data layout
 
 Example source data is organized under:
 
@@ -158,30 +354,12 @@ gold/     # Final feature tables and metrics
 
 ---
 
-## Azure Platform
-
-The `azure_platform/` directory contains a cloud-native version of the pipeline designed for scalable execution on Azure.
-
-It includes:
-- Docker-based containerization
-- Azure Data Lake Storage Gen2 integration
-- job-oriented execution for pipeline stages
-- environment-variable configuration
-- success markers (`_SUCCESS.json`) for orchestration and handoff
-
-This version is intended for large-scale or repeatable processing workloads where local execution is not sufficient.
-
----
-
-## Tech Stack
+## Tech stack
 
 ### Python
-- `numpy`
-- `pandas`
-- `pyarrow`
-- `laspy`
-- `open3d`
-- `pypcd4`
+- `numpy`, `pandas`, `pyarrow`
+- `laspy`, `pypcd4`, `open3d`
+- `scipy`, `shapely`
 
 ### C++ / Geospatial
 - `PCL`
@@ -193,46 +371,6 @@ This version is intended for large-scale or repeatable processing workloads wher
 - `Azure Data Lake Storage Gen2`
 - `Azure Container Apps`
 - `azcopy`
-
----
-
-## Repository Structure
-
-```text
-├── scripts/                          # Core processing scripts
-│   ├── smrf_ground_classification.py
-│   ├── clustering_only.cpp
-│   └── pcd_to_ndvi_las.py
-├── azure_platform/                   # Azure-native pipeline components
-├── images/                           # README and visualization assets
-├── enhanced_volume_calculation.ipynb # Alpha-shape and advanced volume analysis
-├── polynoms_volume_calculation.ipynb # Polynomial envelope volume estimation
-├── read_plot_voxelization.ipynb      # Voxelization experiments and plotting
-├── visualize_parquet.ipynb           # Output inspection and visualization
-└── pointcloud_transformer_autoencoder.py
-```
-
----
-
-## Usage
-
-### Azure pipeline
-
-Run the cloud pipeline from the Azure deployment directory:
-
-```bash
-cd azure_platform
-./run_all.sh
-```
-
-### Local execution
-
-Individual stages can also be run locally from the `scripts/` directory, depending on the data and environment available:
-
-- ground classification with PDAL / SMRF
-- clustering and segmentation with PCL
-- NDVI generation from multispectral LAS/LAZ
-- notebook-based experimentation for volume estimation and analysis
 
 ---
 
@@ -253,23 +391,13 @@ These outputs are designed for:
 - temporal comparison across acquisitions
 - precision agriculture workflows
 
----
-
-## Research and Development
-
-In addition to the production pipeline, the repository includes notebooks and generators for testing and method development.
-
-Examples:
-- synthetic point cloud generation for controlled experiments
-- comparison of multiple volume estimation strategies
-- visualization of processed Parquet outputs
-- exploration of learning-based point cloud models
-
-
 ![Olive Tree Height Above Ground](images/olive.png)
 
 ---
 
-## Project Goal
+## Project goal
 
-The goal of this project is to build a reliable and scalable pipeline for extracting per-row vegetation metrics from multispectral point clouds. It combines classical geospatial processing, high-performance point cloud segmentation, and cloud deployment to support large-scale agricultural analysis.
+The goal of this project is to build a reliable and scalable pipeline for
+extracting per-row vegetation metrics from multispectral point clouds. It
+combines classical geospatial processing, high-performance point cloud
+segmentation, and cloud deployment to support large-scale agricultural analysis.

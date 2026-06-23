@@ -58,8 +58,11 @@ import numpy as np
 import pandas as pd
 
 HERE = Path(__file__).resolve().parent
-if str(HERE) not in sys.path:
-    sys.path.insert(0, str(HERE))
+# Core pipeline modules live in scripts/pipeline/ (one level up from this folder).
+PIPELINE_DIR = HERE.parent / "pipeline"
+for _p in (str(PIPELINE_DIR), str(HERE)):
+    if _p not in sys.path:
+        sys.path.insert(0, _p)
 
 from compute_row_features import (  # noqa: E402
     compute_voxel_volume,

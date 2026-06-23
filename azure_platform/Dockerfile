@@ -27,14 +27,14 @@ RUN apt-get update && apt-get install -y \
 
 WORKDIR /src
 
-# Copy C++ source and CMakeLists.txt from scripts/
-COPY ./scripts/CMakeLists.txt ./scripts/CMakeLists.txt
-COPY ./scripts/clustering_only.cpp ./scripts/clustering_only.cpp
+# Copy C++ source from scripts/clustering/ (+ experimental sources it references in scripts/alternatives/)
+COPY ./scripts/clustering/CMakeLists.txt ./scripts/clustering/CMakeLists.txt
+COPY ./scripts/clustering/clustering_only.cpp ./scripts/clustering/clustering_only.cpp
 COPY ./scripts/alternatives ./scripts/alternatives
 
 # Build C++ binaries
-RUN cd scripts && cmake -S . -B build -DCMAKE_BUILD_TYPE=Release \
-    && cmake --build build -j$(nproc)
+RUN cmake -S scripts/clustering -B scripts/clustering/build -DCMAKE_BUILD_TYPE=Release \
+    && cmake --build scripts/clustering/build -j$(nproc)
 
 # ---------- Runtime stage ----------
 FROM ubuntu:22.04
@@ -58,12 +58,12 @@ WORKDIR /app
 # Copy pipeline job scripts
 COPY ./azure_platform ./azure_platform
 
-# Copy reusable Python code from scripts/
-COPY ./scripts/*.py ./scripts/
+# Copy reusable Python code (core modules live in scripts/pipeline/) and entry scripts
+COPY ./scripts/pipeline ./scripts/pipeline
 COPY ./scripts/*.sh ./scripts/
 
 # Copy built C++ binary from builder stage
-COPY --from=builder /src/scripts/build/clustering_only /app/bin/clustering_only
+COPY --from=builder /src/scripts/clustering/build/clustering_only /app/bin/clustering_only
 
 # Install Python dependencies
 COPY ./azure_platform/requirements.txt /app/requirements.txt

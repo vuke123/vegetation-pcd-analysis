@@ -91,6 +91,18 @@ def get_int(key: str, default: int) -> int:
         return default
 
 
+def get_optional_float(key: str, default: Optional[float]) -> Optional[float]:
+    """Like get_float, but an unset/empty value yields ``default`` (which may be
+    ``None``). Used for knobs whose "unset" state means "auto-estimate"."""
+    v = _raw(key)
+    if v is None or v.strip() == "":
+        return default
+    try:
+        return float(v)
+    except ValueError:
+        return default
+
+
 # --- Typed parameters (fallbacks == original hardcoded values) ---------------
 
 OUT_GROUND_DIR = get_str("OUT_GROUND_DIR", "./out_ground")
@@ -112,10 +124,15 @@ MAX_VALID_CLUSTERS = get_int("MAX_VALID_CLUSTERS", 50)
 NDVI_EPS = get_float("NDVI_EPS", 1e-6)
 NDVI_LOW_THRESHOLD = get_float("NDVI_LOW_THRESHOLD", 0.2)
 
+# Fixed voxel edge [m] for the production volume (set in pipeline_config.env).
+# Falls back to None -> auto heuristic below when the key is unset/empty.
+VOXEL_SIZE = get_optional_float("VOXEL_SIZE", None)
 VOXEL_AUTO_FACTOR = get_float("VOXEL_AUTO_FACTOR", 0.05)
 VOXEL_AUTO_MIN = get_float("VOXEL_AUTO_MIN", 0.01)
 VOXEL_AUTO_MAX = get_float("VOXEL_AUTO_MAX", 0.20)
 
+# Fixed alpha-shape circumradius [m]; None -> per-cluster NN estimate.
+SLICE_RMAX = get_optional_float("SLICE_RMAX", None)
 SLICE_N_SLICES = get_int("SLICE_N_SLICES", 30)
 
 RANSAC_LOW_FRACTION = get_float("RANSAC_LOW_FRACTION", 0.10)

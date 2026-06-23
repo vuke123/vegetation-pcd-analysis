@@ -5,6 +5,11 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$ROOT_DIR"
 
+# Core pipeline modules live in scripts/pipeline/. Put that dir on PYTHONPATH so
+# the inline SMRF step (python3 - <<PY, which runs with cwd on sys.path) can
+# `import smrf_ground_classification`, and so any child process inherits it.
+export PYTHONPATH="$ROOT_DIR/pipeline${PYTHONPATH:+:$PYTHONPATH}"
+
 # --- Load shared tunable parameters ------------------------------------------
 # All knobs (SMRF, clustering, volume, NDVI, RANSAC) live in pipeline_config.env.
 # `set -a` exports every value so the Python SMRF step and the C++ clustering
@@ -76,11 +81,18 @@ PY
 )
 echo "Non-ground LAS: ${NON_GROUND_LAS}"
 
-echo "=== [2/6] Building C++ targets (cmake --build build -j) ==="
-cmake --build build -j
+echo "=== [2/6] Building C++ targets (cmake --build) ==="
+# The C++ clustering target lives in scripts/clustering/. Configure the build
+# tree on first run (a fresh clone has no build/), then build incrementally.
+CLUSTER_BUILD_DIR="clustering/build"
+if [ ! -f "$CLUSTER_BUILD_DIR/CMakeCache.txt" ]; then
+  cmake -S clustering -B "$CLUSTER_BUILD_DIR" -DCMAKE_BUILD_TYPE=Release
+fi
+cmake --build "$CLUSTER_BUILD_DIR" -j
 
 echo "=== [3/6] Running clustering_only (C++) ==="
-NON_GROUND_LAS="$NON_GROUND_LAS" ./build/clustering_only
+# Run from scripts/ (cwd) so clusters are still written to ./out_cluster.
+NON_GROUND_LAS="$NON_GROUND_LAS" "./$CLUSTER_BUILD_DIR/clustering_only"
 
 echo "=== [4/6] Computing NDVI LAS for each cluster PCD ==="
 mkdir -p "$OUT_CLUSTER_LAS_DIR"
@@ -96,7 +108,7 @@ for pcd in "${cluster_pcds[@]}"; do
   base="$(basename "$pcd" .pcd)"
   out_las="${OUT_CLUSTER_LAS_DIR}/${base}_ndvi.las"
   echo "  - ${pcd} -> ${out_las}"
-  python3 pcd_to_ndvi_las.py \
+  python3 pipeline/pcd_to_ndvi_las.py \
     --pcd "$pcd" \
     --template-las "$template_las" \
     --out-las "$out_las"
@@ -115,7 +127,7 @@ set -euo pipefail
 )
 
 echo "=== [6/6] Compute per-row features ==="
-python3 compute_row_features.py \
+python3 pipeline/compute_row_features.py \
   --in-dir "$OUT_CLUSTER_LAS_DIR" \
   --source-las "$INPUT_LAS" \
   --out "$OUT_CLUSTER_LAS_DIR/row_features.parquet"

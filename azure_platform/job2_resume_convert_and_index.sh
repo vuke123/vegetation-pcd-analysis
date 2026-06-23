@@ -89,7 +89,7 @@ CLUSTER_COUNT=0
 for pcd in "${cluster_pcds[@]}"; do
   out_laz="$CLUSTERS_DIR/cluster_$(printf '%02d' $CLUSTER_COUNT).laz"
 
-  python3 "$SCRIPTS_DIR/pcd_to_ndvi_las.py" \
+  python3 "$SCRIPTS_DIR/pipeline/pcd_to_ndvi_las.py" \
     --pcd "$pcd" \
     --template-las "$TEMPLATE_LAS" \
     --out-las "$out_laz"

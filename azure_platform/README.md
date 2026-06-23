@@ -80,7 +80,7 @@ docker run --rm \
 
 ### Job 1: Ground Removal (`job1_ground_removal.sh`)
 
-Runs SMRF ground classification using existing `scripts/smrf_ground_classification.py`.
+Runs SMRF ground classification using existing `scripts/pipeline/smrf_ground_classification.py`.
 
 **Input:**
 - LAS/LAZ file (multispectral point cloud)
@@ -92,7 +92,7 @@ Runs SMRF ground classification using existing `scripts/smrf_ground_classificati
 
 ### Job 2: Clustering (`job2_clustering.sh`)
 
-Runs Euclidean cluster extraction using existing `scripts/build/clustering_only` (C++).
+Runs Euclidean cluster extraction using existing `scripts/clustering/build/clustering_only` (C++).
 
 **Input:**
 - `silver/run_id=<run_id>/ms/non_ground.laz`

@@ -37,8 +37,8 @@ build/
 ################################################################################
 # C/C++ build artifacts (CMake / Make)
 ################################################################################
-# Your scripts/build folder
-scripts/build/
+# C++ clustering build tree
+scripts/clustering/build/
 # Generic CMake build folders
 build*/
 cmake-build*/

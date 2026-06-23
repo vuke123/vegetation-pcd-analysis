@@ -35,9 +35,11 @@ try:
         RANSAC_LOW_FRACTION,
         RANSAC_N_ITER,
         RANSAC_DIST_THRESH,
+        VOXEL_SIZE,
         VOXEL_AUTO_FACTOR,
         VOXEL_AUTO_MIN,
         VOXEL_AUTO_MAX,
+        SLICE_RMAX,
         SLICE_N_SLICES,
         NDVI_EPS,
         NDVI_LOW_THRESHOLD,
@@ -46,9 +48,11 @@ except Exception:  # pragma: no cover - preserve original behaviour
     RANSAC_LOW_FRACTION = 0.10
     RANSAC_N_ITER = 200
     RANSAC_DIST_THRESH = 0.10
+    VOXEL_SIZE = 0.092
     VOXEL_AUTO_FACTOR = 0.05
     VOXEL_AUTO_MIN = 0.01
     VOXEL_AUTO_MAX = 0.20
+    SLICE_RMAX = 0.428
     SLICE_N_SLICES = 30
     NDVI_EPS = 1e-6
     NDVI_LOW_THRESHOLD = 0.2
@@ -434,9 +438,11 @@ def process_cluster(las_path: Path, source_crs_wkt: str | None = None) -> dict:
     # Height
     height = compute_slope_aware_height(points)
 
-    # Volume (both methods)
-    vol_vox = compute_voxel_volume(points)
-    vol_slc = compute_slice_volume(points)
+    # Volume (both methods). Defaults come from pipeline_config (VOXEL_SIZE,
+    # SLICE_RMAX), validated in synthetic_volume_validation.ipynb. Either may be
+    # None, in which case the function falls back to its auto estimate.
+    vol_vox = compute_voxel_volume(points, VOXEL_SIZE)
+    vol_slc = compute_slice_volume(points, n_slices=SLICE_N_SLICES, rmax=SLICE_RMAX)
 
     # NDVI
     ndvi = compute_ndvi_stats(las)

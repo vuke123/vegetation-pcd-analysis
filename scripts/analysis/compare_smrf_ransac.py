@@ -14,7 +14,12 @@ import matplotlib.pyplot as plt
 import numpy as np
 import open3d as o3d
 
-from smrf_ground_classification import (
+# Core pipeline modules live in scripts/pipeline/ (one level up from this folder).
+_PIPELINE_DIR = Path(__file__).resolve().parent.parent / "pipeline"
+if str(_PIPELINE_DIR) not in sys.path:
+    sys.path.insert(0, str(_PIPELINE_DIR))
+
+from smrf_ground_classification import (  # noqa: E402
     run_smrf_classification,
     split_ground_non_ground,
 )

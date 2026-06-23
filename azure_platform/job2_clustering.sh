@@ -34,7 +34,7 @@ else
   PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
   DEFAULT_BASE="$PROJECT_ROOT"
   SCRIPTS_DIR="$PROJECT_ROOT/scripts"
-  CLUSTERING_BIN="$PROJECT_ROOT/build/clustering_only"
+  CLUSTERING_BIN="$SCRIPTS_DIR/clustering/build/clustering_only"
 fi
 
 # -----------------------------------------------------------------------------
@@ -108,8 +108,8 @@ if [[ ! -f "$CLUSTERING_BIN" ]]; then
   exit 1
 fi
 
-if [[ ! -f "$SCRIPTS_DIR/pcd_to_ndvi_las.py" ]]; then
-  echo "Error: Missing converter script: $SCRIPTS_DIR/pcd_to_ndvi_las.py"
+if [[ ! -f "$SCRIPTS_DIR/pipeline/pcd_to_ndvi_las.py" ]]; then
+  echo "Error: Missing converter script: $SCRIPTS_DIR/pipeline/pcd_to_ndvi_las.py"
   exit 1
 fi
 
@@ -150,7 +150,7 @@ CLUSTER_COUNT=0
 for pcd in "${cluster_pcds[@]}"; do
   out_laz="$CLUSTERS_DIR/cluster_$(printf '%02d' $CLUSTER_COUNT).laz"
 
-  python3 "$SCRIPTS_DIR/pcd_to_ndvi_las.py" \
+  python3 "$SCRIPTS_DIR/pipeline/pcd_to_ndvi_las.py" \
     --pcd "$pcd" \
     --template-las "$INPUT_LAZ" \
     --out-las "$out_laz"
