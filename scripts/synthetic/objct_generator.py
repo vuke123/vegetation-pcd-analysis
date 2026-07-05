@@ -8,14 +8,14 @@ from pathlib import Path
 # ----------------------------
 
 def sample_points_in_sphere(n: int, radius: float, center: tuple[float, float, float], seed: int) -> np.ndarray:
-    """Uniformno uzorkuje točke unutar kugle (solid)."""
+    """Uniformly sample points inside a solid sphere."""
     rng = np.random.default_rng(seed)
 
-    # Random smjer (uniformno po sferi): normal distribucija + normalizacija
+    # Random direction (uniform on the sphere): normal distribution + normalization
     v = rng.normal(size=(n, 3))
     v /= np.linalg.norm(v, axis=1, keepdims=True)
 
-    # Uniformno po volumenu: r = R * U^(1/3)
+    # Uniform over volume: r = R * U^(1/3)
     r = radius * np.cbrt(rng.random(n))
     pts = v * r[:, None] + np.array(center)[None, :]
     return pts
@@ -23,13 +23,13 @@ def sample_points_in_sphere(n: int, radius: float, center: tuple[float, float, f
 def sample_points_in_cylinder(n: int, radius: float, height: float, center: tuple[float, float, float],
                               axis: str = "z", seed: int = 0) -> np.ndarray:
     """
-    Uniformno uzorkuje točke unutar punog valjka.
-    axis: "x", "y" ili "z" (os valjka)
-    height: ukupna visina (od -h/2 do +h/2)
+    Uniformly sample points inside a solid cylinder.
+    axis: "x", "y" or "z" (cylinder axis)
+    height: total height (from -h/2 to +h/2)
     """
     rng = np.random.default_rng(seed)
 
-    # Uniformno u disku: r = R * sqrt(U), theta = 2piV
+    # Uniform in the disk: r = R * sqrt(U), theta = 2piV
     u = rng.random(n)
     v = rng.random(n)
     rr = radius * np.sqrt(u)
@@ -71,9 +71,9 @@ def volume_cylinder(r: float, h: float) -> float:
 
 def y_extent_radius(obj: dict) -> float:
     """
-    Koliko objekt "strši" u +/-Y smjeru oko centra (bounding extent u Y).
+    How far the object extends in the +/-Y direction around its center (bounding extent in Y).
     - sphere: r
-    - cylinder (axis z ili x): r
+    - cylinder (axis z or x): r
     - cylinder (axis y): height/2
     """
     if obj["type"] == "sphere":
@@ -92,8 +92,8 @@ def y_extent_radius(obj: dict) -> float:
 def write_las(points_xyz: np.ndarray, classification: np.ndarray, intensity: np.ndarray,
               out_path: str, scale: float = 0.001) -> str:
     """
-    Spremi XYZ + classification + intensity u LAS.
-    scale=0.001 => mm rezolucija.
+    Save XYZ + classification + intensity to LAS.
+    scale=0.001 => mm resolution.
     """
     out_path = str(Path(out_path))
 
@@ -107,7 +107,7 @@ def write_las(points_xyz: np.ndarray, classification: np.ndarray, intensity: np.
     las.x = points_xyz[:, 0]
     las.y = points_xyz[:, 1]
     las.z = points_xyz[:, 2]
-    las.classification = classification.astype(np.uint8)  # 1..4 (ID objekta)
+    las.classification = classification.astype(np.uint8)  # 1..4 (object ID)
     las.intensity = intensity.astype(np.uint16)           # 1=cylinder, 2=sphere
     las.write(out_path)
     return out_path
@@ -128,18 +128,18 @@ if __name__ == "__main__":
     POINTS_PER_M3 = 80_000
 
     # Overlap control:
-    # 0.15 => susjedi se preklapaju oko 15% njihovih "Y-extent" zbroja
-    OVERLAP_RATIO = 0.20  # probaj 0.10–0.30
+    # 0.15 => neighbours overlap by ~15% of the sum of their Y-extents
+    OVERLAP_RATIO = 0.20  # try 0.10–0.30
 
-    # Lagani jitter po X (da ne budu savršeno u istoj osi) - opcionalno
-    # Stavi 0.0 ako želiš baš na istoj X osi
+    # Slight jitter along X (so they are not perfectly on the same axis) - optional
+    # Set to 0.0 to keep them exactly on the same X axis
     JITTER_X_METERS = 0.05  # +/- 5 cm
-    JITTER_Z_METERS = 0.00  # npr. 0.03 za +/- 3 cm
+    JITTER_Z_METERS = 0.00  # e.g. 0.03 for +/- 3 cm
 
     SEED_LAYOUT = 123
 
-    # Definicija objekata u nizu: cylinder – sphere – sphere (druga veličina) – cylinder
-    # Svi su "solid" (točke unutar volumena).
+    # Object row definition: cylinder – sphere – sphere (different size) – cylinder
+    # All are "solid" (points inside the volume).
     objects = [
         {"name": "cyl_1", "type": "cylinder", "radius": 0.35, "height": 1.80, "axis": "z"},
         {"name": "sph_1", "type": "sphere",   "radius": 0.55},
@@ -161,20 +161,20 @@ if __name__ == "__main__":
     for obj_id, obj in enumerate(objects, start=1):
         curr_yext = y_extent_radius(obj)
 
-        # centri po Y s kontroliranim preklapanjem bounding extenta
+        # centers along Y with controlled overlap of the bounding extent
         if prev_center_y is None:
             cy = base_y
         else:
             d = (prev_yext + curr_yext) * (1.0 - OVERLAP_RATIO)
             cy = prev_center_y + d
 
-        # mali jitter po X/Z (opcionalno)
+        # small jitter along X/Z (optional)
         cx = base_x + (rng_layout.random() - 0.5) * 2.0 * JITTER_X_METERS
         cz = base_z + (rng_layout.random() - 0.5) * 2.0 * JITTER_Z_METERS
 
         center = (cx, cy, cz)
 
-        # volumen + broj točaka proporcionalno volumenu
+        # volume + number of points proportional to volume
         if obj["type"] == "sphere":
             r = float(obj["radius"])
             vol = volume_sphere(r)

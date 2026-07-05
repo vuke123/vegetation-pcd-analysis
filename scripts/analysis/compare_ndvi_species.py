@@ -47,8 +47,8 @@ import numpy as np
 
 # ---------------------------------------------------------------------------
 # Species reference windows used to normalize raw NDVI into a 0..1 health
-# score. These are starting points from literature for ~July/Aug acquisitions
-# with high-resolution drone multispectral sensors. Adjust per dataset.
+# score. These reference values come from literature for ~July/Aug acquisitions
+# with high-resolution drone multispectral sensors and are dataset-dependent.
 # ---------------------------------------------------------------------------
 DEFAULT_REF_VINEYARD = (0.35, 0.70)
 DEFAULT_REF_OLIVE = (0.55, 0.85)

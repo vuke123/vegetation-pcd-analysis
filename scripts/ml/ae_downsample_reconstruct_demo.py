@@ -56,7 +56,7 @@ def choose_target_pcd(cluster_dir: str, target_pcd: str) -> str:
             raise FileNotFoundError(f"Target PCD not found: {target_pcd}")
         return str(p)
 
-    # Fallback: try some typical patterns from your pipeline
+    # Fallback: try some typical patterns from the pipeline
     patterns = [
         "config1_leaf00cm_tol40cm_cluster_00.pcd",
         "config*_cluster_00.pcd",

@@ -166,11 +166,8 @@ bool loadPointCloud(const std::string& filename, pcl::PointCloud<PointT>::Ptr cl
             {
                 std::cout << "  WARNING: LAS file has NO RGB dimensions. "
                           << "This script requires color; ground color prefilter will not work.\n";
-                // If you prefer, you can abort here:
-                // return false;
-            
-                // Or continue without color (all zeros):
-                // in practice aborting is clearer so you notice the issue.
+                // Could abort here (return false); instead continue without
+                // color (all zeros). Aborting would make the issue more visible.
             }
             pdal::LasHeader h = las_reader.header();
             std::cout << "Loaded LAS: " << filename << "\n";
@@ -222,7 +219,7 @@ bool loadPointCloud(const std::string& filename, pcl::PointCloud<PointT>::Ptr cl
                 return rgbIs16bit ? static_cast<uint8_t>(v16 >> 8) : static_cast<uint8_t>(v16 & 0xFF);
             };
 
-            // Print a few raw RGB samples so you can see the format
+            // Print a few raw RGB samples to show the format
             const std::size_t printN = std::min<std::size_t>(10, (std::size_t)view->size());
             std::cout << "  RGB samples (first " << printN << "):\n";
             for (pdal::PointId i = 0; i < printN; ++i)
@@ -407,7 +404,7 @@ int main(int argc, char** argv)
 
             while (it < MAX_GROUND_ITERS && working->size() >= 100)
             {
-                // ---------- COLOR PREFILTER: kandidati samo za FIT ----------
+                // ---------- COLOR PREFILTER: candidates for FIT only ----------
                 pcl::PointIndices::Ptr candidates(new pcl::PointIndices);
                 candidates->indices.reserve(working->size() / 3);
 

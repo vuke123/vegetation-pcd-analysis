@@ -75,7 +75,7 @@ def merge_las_files(
                         writer.write_points(chunk.points[mask_keep])
                         total_out += int(np.count_nonzero(mask_keep))
 
-    print(f"\n✅ Wrote merged LAS: {output}")
+    print(f"\nWrote merged LAS: {output}")
     print(f"Total input points:  {total_in:,}")
     print(f"Total output points: {total_out:,}")
     if dedup:

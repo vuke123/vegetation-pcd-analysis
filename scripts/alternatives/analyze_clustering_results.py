@@ -90,7 +90,7 @@ def analyze_results():
                   f"[leaf={params.get('leaf', '?')}m, "
                   f"dist={params.get('dist', '?')}m, clust={params.get('clust', '?')}m]")
     else:
-        print("⚠️  No configurations produced 2-15 clusters. Try different parameters.")
+        print("No configurations produced 2-15 clusters. Try different parameters.")
     
     print()
     print("=" * 80)

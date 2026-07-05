@@ -81,7 +81,7 @@ fi
 START_TIME=$(date +%s)
 
 # -----------------------------------------------------------------------------
-# Convert PCD -> LAZ using your Python script (safe casting + optional NDVI extra dim)
+# Convert PCD -> LAZ using the Python script (safe casting + optional NDVI extra dim)
 # -----------------------------------------------------------------------------
 echo "Converting ${#cluster_pcds[@]} PCD clusters to LAZ using pcd_to_ndvi_las.py..."
 

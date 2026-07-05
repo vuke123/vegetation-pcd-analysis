@@ -48,7 +48,7 @@ def _las_to_dataframe(las_path: str, apply_scale: bool = True) -> pd.DataFrame:
     Implementation copied from scripts/read_plot_voxelization.ipynb so that
     this script can reuse the same loader behavior.
     """
-    print(f"📂 Loading LAS/LAZ file: {las_path}")
+    print(f"Loading LAS/LAZ file: {las_path}")
     las = laspy.read(las_path)
 
     print(f"Number of points: {las.header.point_count:,}")

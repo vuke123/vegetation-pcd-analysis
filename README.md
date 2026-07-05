@@ -8,7 +8,7 @@
 ## What is in this repository?
 
 This repo turns a raw multispectral LAS/LAZ point cloud of a vineyard (or olive
-grove) into an analysis-ready table of **per-row vegetation metrics** — NDVI,
+grove) into an analysis-ready table of per-row vegetation metrics — NDVI,
 canopy volume, height, geometry and temperature. It contains four things:
 
 | # | Component | Folder | What it is |
@@ -233,7 +233,7 @@ algorithm through PDAL, separating terrain from vegetation.
 ### 2. Clustering & segmentation
 
 Vegetation points are segmented into rows/plants. The production implementation
-is **C++ with PCL** Euclidean clustering for performance and scalability.
+is C++ with PCL Euclidean clustering.
 
 - Script: `scripts/clustering/clustering_only.cpp`
 - Euclidean cluster extraction, optional voxel downsampling, outlier removal, parameter sweeps, cluster export.
@@ -279,14 +279,13 @@ analysis-ready outputs:
 ### SMRF ground classification
 
 Ground removal uses PDAL's SMRF filter with configurable slope, window,
-threshold and scalar parameters. This provides robust terrain separation in
-agricultural scenes with uneven ground.
+threshold and scalar parameters, which handles the uneven ground typical of
+agricultural scenes.
 
 ### PCL Euclidean clustering
 
-The main clustering implementation uses `pcl::EuclideanClusterExtraction` for
-high-performance segmentation. It is designed for production use and supports
-filtering, downsampling and batch parameter evaluation.
+The main clustering implementation uses `pcl::EuclideanClusterExtraction`. It
+supports filtering, downsampling and batch parameter evaluation.
 
 ### Polynomial slice-based volume
 
@@ -305,7 +304,7 @@ This is the most geometrically detailed approach in the repository.
 
 The enhanced volume workflow uses slice-wise clustering and 2D alpha shapes to
 reconstruct concave boundaries. Polygon area is computed exactly with the
-shoelace formula, making this robust for irregular vegetation structure.
+shoelace formula, which suits irregular vegetation structure.
 
 ### Deep learning / research components
 
@@ -384,12 +383,8 @@ Typical outputs include:
 - NDVI-enriched LAS outputs
 - volume comparison metrics across methods
 
-These outputs are designed for:
-- vineyard health monitoring
-- canopy structure analysis
-- yield estimation
-- temporal comparison across acquisitions
-- precision agriculture workflows
+These feed into downstream work such as vineyard health monitoring, canopy
+structure analysis, yield estimation, and comparison across acquisition dates.
 
 ![Olive Tree Height Above Ground](images/olive.png)
 
@@ -397,7 +392,6 @@ These outputs are designed for:
 
 ## Project goal
 
-The goal of this project is to build a reliable and scalable pipeline for
-extracting per-row vegetation metrics from multispectral point clouds. It
-combines classical geospatial processing, high-performance point cloud
-segmentation, and cloud deployment to support large-scale agricultural analysis.
+The project builds a pipeline for extracting per-row vegetation metrics from
+multispectral point clouds, combining classical geospatial processing, point
+cloud segmentation, and a containerised deployment for larger datasets.

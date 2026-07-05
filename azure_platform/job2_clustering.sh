@@ -120,7 +120,7 @@ START_TIME=$(date +%s)
 # -----------------------------------------------------------------------------
 cd "$SCRIPTS_DIR"
 
-# clustering_only reads these env vars (per your edited C++)
+# clustering_only reads these env vars (set by the C++ clustering step)
 export NON_GROUND_LAS="$INPUT_LAZ"
 export OUT_CLUSTER_DIR="$CLUSTERS_DIR"
 

@@ -27,7 +27,7 @@ def _pcd_to_dataframe_all_fields(pcd_path: str) -> pd.DataFrame:
     if not p.is_file():
         raise FileNotFoundError(f"PCD not found: {p}")
 
-    print(f"📂 Loading PCD (all fields): {p}")
+    print(f"Loading PCD (all fields): {p}")
     pc = PointCloud.from_path(str(p))
 
     fields = list(pc.fields)  # e.g. ['x','y','z','intensity','red','infrared',...]
@@ -156,8 +156,8 @@ def export_filtered_las(df: pd.DataFrame, las_template: laspy.LasData, output_pa
             set_or_extra(col, v, dtype)
 
     out.write(str(out_path))
-    print(f"✅ Wrote LAS: {out_path} (points={n:,})")
-    print("✅ Output dims:", list(out.point_format.dimension_names))
+    print(f"Wrote LAS: {out_path} (points={n:,})")
+    print("Output dims:", list(out.point_format.dimension_names))
 
 
 

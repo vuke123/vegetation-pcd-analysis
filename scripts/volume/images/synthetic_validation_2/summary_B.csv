@@ -1,0 +1,4 @@
+stage,metric,value,true_m3,signed_err_%
+SMRF ground removal,recall / precision / IoU / acc,1.000 / 0.992 / 0.992 / 0.995,-,-
+voxel on non-ground,s=0.092 m,6.856,7.511,-8.72
+slice+alpha on non-ground,rmax=0.358 m,7.449,7.511,-0.82

@@ -19,13 +19,13 @@ if [ ! -d "$OUT_CLUSTER_LAS_DIR" ] || [ -z "$(ls -A "$OUT_CLUSTER_LAS_DIR"/*.las
 fi
 
 echo "=== [6/7] Compute per-row features ==="
-python3 pipeline/compute_row_features.py \
+python3 compute_row_features.py \
   --in-dir "$OUT_CLUSTER_LAS_DIR" \
   --source-las "$INPUT_LAS" \
   --out "$OUT_CLUSTER_LAS_DIR/row_features.parquet"
 
 echo "=== [7/7] Compute canopy structure metrics (segment-based) ==="
-python3 pipeline/compute_canopy_structure.py \
+python3 compute_canopy_structure.py \
   --in-dir "$OUT_CLUSTER_LAS_DIR" \
   --source-las "$INPUT_LAS" \
   --segment-length 1.0 \

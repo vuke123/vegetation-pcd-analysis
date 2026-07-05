@@ -1,20 +1,20 @@
 # Canopy structure and per-row features — methodology report
 
-This report explains **why** and **how** the pipeline driven by
+This report explains why and how the pipeline driven by
 `scripts/run_pipeline.sh` computes per-row canopy features. It documents
 the two feature-extraction stages that come at the end of the pipeline:
 
-1. `compute_canopy_structure.py` — **canopy structure** (porosity, gap
+1. `compute_canopy_structure.py` — canopy structure (porosity, gap
    fraction, LAI proxy, LAD proxy) using a segment-by-segment voxel
    analysis along each row.
-2. `compute_row_features.py` — **geometric & radiometric** row features
+2. `compute_row_features.py` — geometric and radiometric row features
    (height, length/width/azimuth, volume, NDVI statistics).
 
-The focus, as requested, is on **LAI, gap fraction, and porosity**: what
-they mean, why we compute them this way, and how the algorithm gets from
-a point cloud to a number.
+The focus is on LAI, gap fraction, and porosity: what they mean, why we
+compute them this way, and how the algorithm gets from a point cloud to a
+number.
 
-> All metrics here are **structural proxies** derived from a discrete-return
+> All metrics here are structural proxies derived from a discrete-return
 > multispectral point cloud (drone, ~July 2025). They are not equivalent
 > to field-measured LAI or physically modelled LAD. They are valid for
 > *relative* comparisons across rows within the same acquisition.
@@ -36,7 +36,7 @@ a point cloud to a number.
 ```
 
 Steps 1–5 deliver, for each row, a self-contained LAS file containing
-**only above-ground vegetation points** for that row, with NDVI attached
+only above-ground vegetation points for that row, with NDVI attached
 per point. The feature stage assumes that input.
 
 That assumption is the whole reason the metrics in step 6 can be computed
@@ -56,7 +56,7 @@ needs because:
   (high gap fraction, low LAI), so total intercepted light per metre of
   row is much lower.
 
-Canopy **structure** captures the second axis. NDVI alone cannot, because
+Canopy structure captures the second axis. NDVI alone cannot, because
 NDVI saturates and reflects per-leaf physiology, not how much canopy is
 actually there.
 
@@ -69,7 +69,7 @@ The three structural metrics the pipeline reports are:
 | **LAI (proxy)** | Beer–Lambert inversion of gap fraction | Leaf area per unit ground area |
 | **LAD (proxy)** | Vertical profile of layer-wise LAI density | Leaf area density at each height |
 
-All four come from the **same** discrete voxelization. We just summarise
+All four come from the same discrete voxelization. We just summarise
 the occupancy grid in three different ways.
 
 ---
@@ -100,14 +100,14 @@ derived from such a gap fraction is meaningless.
 
 Instead, the pipeline:
 
-1. **Rotates each row** into a local frame where `u` is along the row
+1. Rotates each row into a local frame where `u` is along the row
    and `v` is across it (PCA on the XY coordinates picks `u`).
-2. **Splits the row** along `u` into segments of `segment_length` metres
+2. Splits the row along `u` into segments of `segment_length` metres
    (default 1.0 m).
-3. **Voxelizes each segment in its own tight bounding box.** A 1 m
+3. Voxelizes each segment in its own tight bounding box. A 1 m
    segment containing canopy is ~1.0 × 1.0 × 2.0 m, so the surrounding
    air is minimal.
-4. **Aggregates** the per-segment metrics into row-level mean / p50 / p90.
+4. Aggregates the per-segment metrics into row-level mean / p50 / p90.
 
 This produces structure metrics that reflect the canopy's internal
 openness, not the emptiness of a 100 m long box around it.
@@ -130,7 +130,7 @@ implemented in `_estimate_row_direction` and `_project_to_local`.
 ### What it is
 
 Porosity is the fraction of voxels inside the segment's 3D bounding box
-that contain **no points**:
+that contain no points:
 
 ```
 porosity = 1 − n_filled / n_total
@@ -151,9 +151,9 @@ quantises that question:
 - A cell with at least one return is treated as occupied.
 - A cell with no returns is treated as empty (air or fully occluded).
 
-Porosity, computed on the **segment's own bounding box** rather than the
-full row's, then approximates *internal airiness of the canopy cross-section*
-in that segment.
+Porosity, computed on the segment's own bounding box rather than the
+full row's, then approximates the internal airiness of the canopy
+cross-section in that segment.
 
 ### Per-row aggregation
 
@@ -170,8 +170,8 @@ Porosity depends strongly on the voxel size:
 - Too large (e.g. 30 cm): every voxel is occupied, porosity collapses to
   near zero and the metric loses discriminative power.
 
-The default in the pipeline is **10 cm**. The `lai_voxel_size_sensitivity.py`
-script (deliverable 3) lets you see this dependency empirically.
+The default in the pipeline is 10 cm. The `lai_voxel_size_sensitivity.py`
+script shows this dependency empirically.
 
 ---
 
@@ -189,12 +189,12 @@ gap_fraction = 1 − n_occupied_vz / n_total_vz
 where:
 
 - We collapse the segment's voxel grid along `u` (along-row).
-- A (v, z) cell is **occupied** if *any* u-voxel at that (v, z) is filled.
+- A (v, z) cell is occupied if any u-voxel at that (v, z) is filled.
 - `n_total_vz = nv × nz`.
 
 ### Why the v–z plane (not top-down)
 
-For vineyard rows, the canopy is functionally a **wall**, not a closed
+For vineyard rows, the canopy is functionally a wall, not a closed
 overstory. The biologically meaningful gap is what you see when you
 project the canopy onto the cross-row vertical plane — the view a
 sun-tracking light meter or a side-looking sensor would integrate.
@@ -242,7 +242,7 @@ P(gap) = exp( − G · L / cos(θ) )
 
 - `L`  — leaf area index (one-sided leaf area per unit ground area).
 - `G`  — projection of unit leaf area in the direction of the beam.
-  For a **spherical** (random) leaf angle distribution viewed from nadir,
+  For a spherical (random) leaf angle distribution viewed from nadir,
   `G = 0.5`.
 - `θ`  — zenith angle of the beam. For nadir, `cos(θ) = 1`.
 
@@ -297,7 +297,7 @@ sections.
 ### What it is
 
 Where LAI summarises the whole segment, LAD (leaf area density) tells
-you **where in the canopy the leaves are**: how much canopy is in the
+you where in the canopy the leaves are: how much canopy is in the
 0.5–1.0 m band vs the 1.0–1.5 m band, etc. This matters for spray
 targeting and pruning decisions.
 
@@ -342,11 +342,11 @@ the row's overall shape and radiometry.
 
 ### 7.1 Slope-aware height
 
-The cluster LAS is above-ground vegetation but is **not** referenced to a
+The cluster LAS is above-ground vegetation but is not referenced to a
 true ground surface — heights are absolute Z coordinates and the
 underlying ground may slope. To get a sensible "canopy height above
 local ground" without rerunning SMRF, the script fits a ground plane
-**locally**:
+locally:
 
 1. Take the lowest 10 % of points (by Z) as candidate ground.
 2. RANSAC: repeatedly pick 3 random points, fit a plane, count inliers
@@ -376,7 +376,7 @@ in one shot:
 
 ### 7.3 Volume — two estimators
 
-The pipeline reports two volume estimates **on purpose**, because each
+The pipeline reports two volume estimates on purpose, because each
 is biased in a different direction:
 
 #### Voxel volume (`vol_voxel`)
@@ -424,7 +424,7 @@ Per cluster:
 - `ndvi_low_frac` = share of points with NDVI < 0.2 (a coarse senescent /
   stress indicator).
 
-These are the **inputs** to the species-aware NDVI comparison
+These are the inputs to the species-aware NDVI comparison
 (`scripts/compare_ndvi_species.py`) and the basis for any vigour map.
 
 ---
@@ -488,9 +488,8 @@ Items to consider:
    between 0.25 m and 5.0 m. Confirm that means/p50 stabilise at the
    chosen default and that the cross-row width is fully captured.
 3. **`G` ablation.** Recompute LAI proxy with `G ∈ {0.4, 0.5, 0.6}`.
-   Report how much the relative ranking of rows changes (you should
-   find: very little — that is the value of using these as relative
-   indices).
+   Report how much the relative ranking of rows changes; it should change
+   very little, which is the point of using these as relative indices.
 4. **Cross-species reference windows.** The NDVI comparison script uses
-   default windows (olive 0.55–0.85, vineyard 0.35–0.70). Calibrate
-   these from your dataset before drawing thesis conclusions.
+   default windows (olive 0.55–0.85, vineyard 0.35–0.70). These should be
+   calibrated on the dataset before drawing conclusions from them.

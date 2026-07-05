@@ -278,7 +278,7 @@ def visualize_before_after(
 
 
 if __name__ == "__main__":
-    # Example usage; adjust paths as needed.
+    # Example usage.
     example_input = "../datasource/2025-07-15-MS_Vinograd_1.las"
     output_directory = "./out_ground"
 
